@@ -287,6 +287,7 @@ set(LLVM_ALL_TARGETS
   AArch64
   AMDGPU
   ARM
+  Alpha
   BPF
   Hexagon
   Lanai
