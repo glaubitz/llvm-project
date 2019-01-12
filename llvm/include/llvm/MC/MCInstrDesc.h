@@ -62,7 +62,21 @@ enum OperandType {
 
 }
 
-/// This holds information about one operand of a machine instruction,
+/// \brief Defines an operand group.
+///
+/// Many machine operands are aggregates of multiple target operands (e.g.
+/// register, immediate) and during codegen it is not always clear how many
+/// those operands to read. This type provides this information.
+class MIOperandInfo {
+  public:
+    int16_t MINo;
+    int16_t Type;
+    int16_t OpsNum;
+
+    bool isTargetType() { return Type >= MCOI::OPERAND_FIRST_TARGET; };
+};
+
+/// \brief This holds information about one operand of a machine instruction,
 /// indicating the register class for register operands, etc.
 class MCOperandInfo {
 public:
@@ -164,6 +178,7 @@ enum Flag {
 class MCInstrDesc {
 public:
   unsigned short Opcode;         // The opcode number
+  unsigned short NumMIOperands;  // Num of MI operands
   unsigned short NumOperands;    // Num of args (may be more if variable_ops)
   unsigned char NumDefs;         // Num of args that are definitions
   unsigned char Size;            // Number of bytes in encoding.
@@ -172,6 +187,7 @@ public:
   uint64_t TSFlags;              // Target Specific Flag values
   const MCPhysReg *ImplicitUses; // Registers implicitly read by this instr
   const MCPhysReg *ImplicitDefs; // Registers implicitly defined by this instr
+  const MIOperandInfo *MIOpInfo; // 'NumMIOperands' entries about operands
   const MCOperandInfo *OpInfo;   // 'NumOperands' entries about operands
   // Subtarget feature that this is deprecated on, if any
   // -1 implies this is not deprecated by any single feature. It may still be

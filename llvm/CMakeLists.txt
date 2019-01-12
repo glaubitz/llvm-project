@@ -296,6 +296,7 @@ set(LLVM_ALL_TARGETS
   PowerPC
   Sparc
   SystemZ
+  M680x0
   WebAssembly
   X86
   XCore
