@@ -84,6 +84,7 @@ MCOperand M68kMCInstLower::LowerSymbolOperand(const MachineOperand &MO,
   case M68kII::MO_NO_FLAG:
   case M68kII::MO_ABSOLUTE_ADDRESS:
   case M68kII::MO_PC_RELATIVE_ADDRESS:
+  case M68kII::MO_PC_RELATIVE_ADDRESS_32:
     break;
   case M68kII::MO_GOTPCREL:
     RefKind = M68k::S_GOTPCREL;
@@ -170,15 +171,19 @@ void M68kMCInstLower::Lower(const MachineInstr *MI, MCInst &OutMI) const {
       OutMI.addOperand(MCOp.value());
   }
 
-  // TAILJMPj, TAILJMPq - Lower to the correct jump instructions.
-  if (Opcode == M68k::TAILJMPj || Opcode == M68k::TAILJMPq) {
+  // TAILJMPj, TAILJMPq, TAILJMPq32 - Lower to the correct jump instructions.
+  if (Opcode == M68k::TAILJMPj || Opcode == M68k::TAILJMPq ||
+      Opcode == M68k::TAILJMPq32) {
     assert(OutMI.getNumOperands() == 1 && "Unexpected number of operands");
     switch (Opcode) {
     case M68k::TAILJMPj:
       Opcode = M68k::JMP32j;
       break;
     case M68k::TAILJMPq:
-      Opcode = M68k::BRA8;
+      Opcode = M68k::JMP32q;
+      break;
+    case M68k::TAILJMPq32:
+      Opcode = M68k::JMP32q32;
       break;
     }
     OutMI.setOpcode(Opcode);

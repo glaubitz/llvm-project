@@ -176,6 +176,12 @@ void M68kMCCodeEmitter::encodePCRelImm(const MCInst &MI, unsigned OpIdx,
       if (LabelOffset)
         Expr = MCBinaryExpr::createAdd(
             Expr, MCConstantExpr::create(LabelOffset, Ctx), Ctx);
+    } else if (Size == 32 && InsertPos == 32) {
+      // 32-bit PC-relative displacement (Full Format) is relative to the
+      // address of the extension word, which is 2 bytes before the
+      // displacement.
+      Expr = MCBinaryExpr::createAdd(
+          Expr, MCConstantExpr::create(2, Ctx), Ctx);
     }
 
     addFixup(Fixups, InsertByte, Expr, MCFixup::getDataKindForSize(Size / 8),

@@ -80,10 +80,15 @@ struct M68kISelAddressMode {
 
   unsigned char SymbolFlags; // M68kII::MO_*
 
-  M68kISelAddressMode(AddrType AT)
+  CodeModel::Model CodeModel;
+  bool atLeastM68020;
+  bool ForceDisp32;
+
+  M68kISelAddressMode(AddrType AT, CodeModel::Model CM, bool M20)
       : AM(AT), BaseType(Base::RegBase), Disp(0), BaseFrameIndex(0), IndexReg(),
         Scale(1), GV(nullptr), CP(nullptr), BlockAddr(nullptr), ES(nullptr),
-        MCSym(nullptr), JT(-1), Alignment(), SymbolFlags(M68kII::MO_NO_FLAG) {}
+        MCSym(nullptr), JT(-1), Alignment(), SymbolFlags(M68kII::MO_NO_FLAG),
+        CodeModel(CM), atLeastM68020(M20), ForceDisp32(false) {}
 
   bool hasSymbolicDisplacement() const {
     return GV != nullptr || CP != nullptr || ES != nullptr ||
@@ -120,6 +125,11 @@ struct M68kISelAddressMode {
     // These two in the next chip generations can hold upto 32 bit
     case AddrType::ARID:
     case AddrType::PCD:
+      if (ForceDisp32 || SymbolFlags == M68kII::MO_PC_RELATIVE_ADDRESS_32)
+        return 32;
+      if (hasSymbolicDisplacement() && atLeastM68020 &&
+          (CodeModel == CodeModel::Medium || CodeModel == CodeModel::Large))
+        return 32;
       return 16;
     case AddrType::AL:
       return 32;
@@ -305,11 +315,13 @@ private:
   bool SelectARIPI(SDNode *Parent, SDValue N, SDValue &Base);
   bool SelectARIPD(SDNode *Parent, SDValue N, SDValue &Base);
   bool SelectARID(SDNode *Parent, SDValue N, SDValue &Imm, SDValue &Base);
-  bool SelectARII(SDNode *Parent, SDValue N, SDValue &Imm, SDValue &Base,
+  bool SelectARID32(SDNode *Parent, SDValue N, SDValue &Imm, SDValue &Base);
+  bool SelectARII(SDNode *Parent, SDValue N, SDValue &Disp, SDValue &Base,
                   SDValue &Index);
   bool SelectAL(SDNode *Parent, SDValue N, SDValue &Sym);
   bool SelectPCD(SDNode *Parent, SDValue N, SDValue &Imm);
-  bool SelectPCI(SDNode *Parent, SDValue N, SDValue &Imm, SDValue &Index);
+  bool SelectPCD32(SDNode *Parent, SDValue N, SDValue &Imm);
+  bool SelectPCI(SDNode *Parent, SDValue N, SDValue &Disp, SDValue &Index);
 
   bool SelectInlineAsmMemoryOperand(const SDValue &Op,
                                     InlineAsm::ConstraintCode ConstraintID,
@@ -557,9 +569,16 @@ bool M68kDAGToDAGISel::matchAddressRecursively(SDValue N,
 
   case M68kISD::Wrapper:
   case M68kISD::WrapperPC:
-    if (matchWrapper(N, AM))
-      return true;
-    break;
+  case M68kISD::WrapperPC32:
+    return matchWrapper(N, AM);
+
+  case ISD::GLOBAL_OFFSET_TABLE:
+    if (AM.hasBase())
+      return false;
+    AM.setBaseReg(CurDAG->getRegister(M68k::PC, MVT::i32));
+    AM.ES = "_GLOBAL_OFFSET_TABLE_";
+    AM.SymbolFlags = M68kII::MO_GOTPCREL;
+    return true;
 
   case ISD::LOAD:
     if (matchLoadInAddress(cast<LoadSDNode>(N), AM))
@@ -664,7 +683,8 @@ bool M68kDAGToDAGISel::matchWrapper(SDValue N, M68kISelAddressMode &AM) {
 
   SDValue N0 = N.getOperand(0);
 
-  if (N.getOpcode() == M68kISD::WrapperPC) {
+  if (N.getOpcode() == M68kISD::WrapperPC ||
+      N.getOpcode() == M68kISD::WrapperPC32) {
 
     // If cannot match here just restore the old version
     M68kISelAddressMode Backup = AM;
@@ -672,6 +692,9 @@ bool M68kDAGToDAGISel::matchWrapper(SDValue N, M68kISelAddressMode &AM) {
     if (AM.hasBase()) {
       return false;
     }
+
+    if (N.getOpcode() == M68kISD::WrapperPC32)
+      AM.ForceDisp32 = true;
 
     if (auto *G = dyn_cast<GlobalAddressSDNode>(N0)) {
       AM.GV = G->getGlobal();
@@ -766,12 +789,36 @@ void M68kDAGToDAGISel::Select(SDNode *Node) {
     break;
 
   case ISD::GLOBAL_OFFSET_TABLE: {
+    unsigned Opc = M68k::LEA32q;
+    unsigned WrapperKind = M68kISD::WrapperPC;
+    if (Subtarget->atLeastM68020() &&
+        Subtarget->isPositionIndependent() &&
+        getTargetMachine().getCodeModel() != CodeModel::Small &&
+        getTargetMachine().getCodeModel() != CodeModel::Kernel) {
+      Opc = M68k::LEA32q32;
+      WrapperKind = M68kISD::WrapperPC32;
+    }
+
     SDValue GOT = CurDAG->getTargetExternalSymbol(
         "_GLOBAL_OFFSET_TABLE_", MVT::i32, M68kII::MO_GOTPCREL);
-    MachineSDNode *Res =
-        CurDAG->getMachineNode(M68k::LEA32q, DL, MVT::i32, GOT);
-    ReplaceNode(Node, Res);
-    return;
+    GOT = CurDAG->getNode(WrapperKind, DL, MVT::i32, GOT);
+    SDValue Disp;
+    if (Opc == M68k::LEA32q32) {
+      if (SelectPCD32(nullptr, GOT, Disp)) {
+        MachineSDNode *Res =
+            CurDAG->getMachineNode(M68k::LEA32q32, DL, MVT::i32, Disp);
+        ReplaceNode(Node, Res);
+        return;
+      }
+    } else {
+      if (SelectPCD(nullptr, GOT, Disp)) {
+        MachineSDNode *Res =
+            CurDAG->getMachineNode(M68k::LEA32q, DL, MVT::i32, Disp);
+        ReplaceNode(Node, Res);
+        return;
+      }
+    }
+    break;
   }
 
   case M68kISD::GLOBAL_BASE_REG:
@@ -811,12 +858,22 @@ bool M68kDAGToDAGISel::SelectARIPD(SDNode *Parent, SDValue N, SDValue &Base) {
 bool M68kDAGToDAGISel::SelectARID(SDNode *Parent, SDValue N, SDValue &Disp,
                                   SDValue &Base) {
   LLVM_DEBUG(dbgs() << "Selecting AddrType::ARID: ");
-  M68kISelAddressMode AM(M68kISelAddressMode::AddrType::ARID);
+  M68kISelAddressMode AM(M68kISelAddressMode::AddrType::ARID,
+                         getTargetMachine().getCodeModel(),
+                         Subtarget->atLeastM68020());
 
   if (!matchAddress(N, AM))
     return false;
 
   if (AM.isPCRelative()) {
+    if (Parent && (Parent->getOpcode() == ISD::STORE ||
+                   Parent->getOpcode() == ISD::ATOMIC_STORE ||
+                   Parent->getOpcode() == ISD::ATOMIC_CMP_SWAP)) {
+      LLVM_DEBUG(dbgs() << "SUCCESS: Using PC-relative as register base for store\n");
+      Disp = getI16Imm(0, SDLoc(N));
+      Base = N;
+      return true;
+    }
     LLVM_DEBUG(dbgs() << "REJECT: Cannot match PC relative address\n");
     return false;
   }
@@ -838,6 +895,11 @@ bool M68kDAGToDAGISel::SelectARID(SDNode *Parent, SDValue N, SDValue &Disp,
   }
 
   Base = AM.BaseReg;
+
+  if (AM.getDispSize() != 16) {
+    LLVM_DEBUG(dbgs() << "REJECT: Not 16-bit displacement\n");
+    return false;
+  }
 
   if (getSymbolicDisplacement(AM, SDLoc(N), Disp)) {
     assert((!AM.Disp || allowARIDWithDisp(Parent)) &&
@@ -866,6 +928,7 @@ static bool isAddressBase(const SDValue &N) {
                         [](const SDUse &U) { return isAddressBase(U.get()); });
   case M68kISD::Wrapper:
   case M68kISD::WrapperPC:
+  case M68kISD::WrapperPC32:
   case M68kISD::GLOBAL_BASE_REG:
     return true;
   default:
@@ -888,15 +951,77 @@ static bool AllowARIIWithZeroDisp(SDNode *Parent) {
   }
 }
 
+bool M68kDAGToDAGISel::SelectARID32(SDNode *Parent, SDValue N, SDValue &Disp,
+                                    SDValue &Base) {
+  LLVM_DEBUG(dbgs() << "Selecting AddrType::ARID32: ");
+  M68kISelAddressMode AM(M68kISelAddressMode::AddrType::ARID,
+                         getTargetMachine().getCodeModel(),
+                         Subtarget->atLeastM68020());
+
+  if (!matchAddress(N, AM))
+    return false;
+
+  if (AM.isPCRelative()) {
+    if (Parent && (Parent->getOpcode() == ISD::STORE ||
+                   Parent->getOpcode() == ISD::ATOMIC_STORE ||
+                   Parent->getOpcode() == ISD::ATOMIC_CMP_SWAP)) {
+      LLVM_DEBUG(dbgs() << "SUCCESS: Using PC-relative as register base for store\n");
+      Disp = getI32Imm(0, SDLoc(N));
+      Base = N;
+      return true;
+    }
+    LLVM_DEBUG(dbgs() << "REJECT: Cannot match PC relative address\n");
+    return false;
+  }
+
+  if (AM.hasIndexReg()) {
+    LLVM_DEBUG(dbgs() << "REJECT: Cannot match Index\n");
+    return false;
+  }
+
+  if (!AM.hasBaseReg()) {
+    LLVM_DEBUG(dbgs() << "REJECT: No Base reg\n");
+    return false;
+  }
+
+  if (AM.getDispSize() != 32) {
+    LLVM_DEBUG(dbgs() << "REJECT: Not 32-bit displacement\n");
+    return false;
+  }
+
+  Base = AM.BaseReg;
+
+  if (getSymbolicDisplacement(AM, SDLoc(N), Disp)) {
+    LLVM_DEBUG(dbgs() << "SUCCESS, matched Symbol\n");
+    return true;
+  }
+
+  Disp = getI32Imm(AM.Disp, SDLoc(N));
+
+  LLVM_DEBUG(dbgs() << "SUCCESS\n");
+  return true;
+}
+
 bool M68kDAGToDAGISel::SelectARII(SDNode *Parent, SDValue N, SDValue &Disp,
                                   SDValue &Base, SDValue &Index) {
-  M68kISelAddressMode AM(M68kISelAddressMode::AddrType::ARII);
+  M68kISelAddressMode AM(M68kISelAddressMode::AddrType::ARII,
+                         getTargetMachine().getCodeModel(),
+                         Subtarget->atLeastM68020());
   LLVM_DEBUG(dbgs() << "Selecting AddrType::ARII: ");
 
   if (!matchAddress(N, AM))
     return false;
 
   if (AM.isPCRelative()) {
+    if (Parent && (Parent->getOpcode() == ISD::STORE ||
+                   Parent->getOpcode() == ISD::ATOMIC_STORE ||
+                   Parent->getOpcode() == ISD::ATOMIC_CMP_SWAP)) {
+      LLVM_DEBUG(dbgs() << "SUCCESS: Using PC-relative as register base for store\n");
+      Disp = getI8Imm(0, SDLoc(N));
+      Base = N;
+      Index = CurDAG->getRegister(0, MVT::i32);
+      return true;
+    }
     LLVM_DEBUG(dbgs() << "REJECT: PC relative\n");
     return false;
   }
@@ -940,7 +1065,9 @@ bool M68kDAGToDAGISel::SelectARII(SDNode *Parent, SDValue N, SDValue &Disp,
 
 bool M68kDAGToDAGISel::SelectAL(SDNode *Parent, SDValue N, SDValue &Sym) {
   LLVM_DEBUG(dbgs() << "Selecting AddrType::AL: ");
-  M68kISelAddressMode AM(M68kISelAddressMode::AddrType::AL);
+  M68kISelAddressMode AM(M68kISelAddressMode::AddrType::AL,
+                         getTargetMachine().getCodeModel(),
+                         Subtarget->atLeastM68020());
 
   if (!matchAddress(N, AM)) {
     LLVM_DEBUG(dbgs() << "REJECT: Match failed\n");
@@ -979,8 +1106,14 @@ bool M68kDAGToDAGISel::SelectAL(SDNode *Parent, SDValue N, SDValue &Sym) {
 }
 
 bool M68kDAGToDAGISel::SelectPCD(SDNode *Parent, SDValue N, SDValue &Disp) {
+  if (Parent && (Parent->getOpcode() == ISD::STORE ||
+                 Parent->getOpcode() == ISD::ATOMIC_STORE ||
+                 Parent->getOpcode() == ISD::ATOMIC_CMP_SWAP))
+    return false;
   LLVM_DEBUG(dbgs() << "Selecting AddrType::PCD: ");
-  M68kISelAddressMode AM(M68kISelAddressMode::AddrType::PCD);
+  M68kISelAddressMode AM(M68kISelAddressMode::AddrType::PCD,
+                         getTargetMachine().getCodeModel(),
+                         Subtarget->atLeastM68020());
 
   if (!matchAddress(N, AM))
     return false;
@@ -995,6 +1128,11 @@ bool M68kDAGToDAGISel::SelectPCD(SDNode *Parent, SDValue N, SDValue &Disp) {
     return false;
   }
 
+  if (AM.getDispSize() != 16) {
+    LLVM_DEBUG(dbgs() << "REJECT: Not 16-bit displacement\n");
+    return false;
+  }
+
   if (getSymbolicDisplacement(AM, SDLoc(N), Disp)) {
     LLVM_DEBUG(dbgs() << "SUCCESS, matched Symbol\n");
     return true;
@@ -1006,10 +1144,55 @@ bool M68kDAGToDAGISel::SelectPCD(SDNode *Parent, SDValue N, SDValue &Disp) {
   return true;
 }
 
+bool M68kDAGToDAGISel::SelectPCD32(SDNode *Parent, SDValue N, SDValue &Disp) {
+  if (Parent && (Parent->getOpcode() == ISD::STORE ||
+                 Parent->getOpcode() == ISD::ATOMIC_STORE ||
+                 Parent->getOpcode() == ISD::ATOMIC_CMP_SWAP))
+    return false;
+  LLVM_DEBUG(dbgs() << "Selecting AddrType::PCD32: ");
+  M68kISelAddressMode AM(M68kISelAddressMode::AddrType::PCD,
+                         getTargetMachine().getCodeModel(),
+                         Subtarget->atLeastM68020());
+
+  if (!matchAddress(N, AM))
+    return false;
+
+  if (!AM.isPCRelative()) {
+    LLVM_DEBUG(dbgs() << "REJECT: Not PC relative\n");
+    return false;
+  }
+
+  if (AM.hasIndexReg()) {
+    LLVM_DEBUG(dbgs() << "REJECT: Cannot match Index\n");
+    return false;
+  }
+
+  if (AM.getDispSize() != 32) {
+    LLVM_DEBUG(dbgs() << "REJECT: Not 32-bit displacement\n");
+    return false;
+  }
+
+  if (getSymbolicDisplacement(AM, SDLoc(N), Disp)) {
+    LLVM_DEBUG(dbgs() << "SUCCESS, matched Symbol\n");
+    return true;
+  }
+
+  Disp = getI32Imm(AM.Disp, SDLoc(N));
+
+  LLVM_DEBUG(dbgs() << "SUCCESS\n");
+  return true;
+}
+
 bool M68kDAGToDAGISel::SelectPCI(SDNode *Parent, SDValue N, SDValue &Disp,
                                  SDValue &Index) {
+  if (Parent && (Parent->getOpcode() == ISD::STORE ||
+                 Parent->getOpcode() == ISD::ATOMIC_STORE ||
+                 Parent->getOpcode() == ISD::ATOMIC_CMP_SWAP))
+    return false;
   LLVM_DEBUG(dbgs() << "Selecting AddrType::PCI: ");
-  M68kISelAddressMode AM(M68kISelAddressMode::AddrType::PCI);
+  M68kISelAddressMode AM(M68kISelAddressMode::AddrType::PCI,
+                         getTargetMachine().getCodeModel(),
+                         Subtarget->atLeastM68020());
 
   if (!matchAddress(N, AM))
     return false;
@@ -1040,7 +1223,9 @@ bool M68kDAGToDAGISel::SelectPCI(SDNode *Parent, SDValue N, SDValue &Disp,
 
 bool M68kDAGToDAGISel::SelectARI(SDNode *Parent, SDValue N, SDValue &Base) {
   LLVM_DEBUG(dbgs() << "Selecting AddrType::ARI: ");
-  M68kISelAddressMode AM(M68kISelAddressMode::AddrType::ARI);
+  M68kISelAddressMode AM(M68kISelAddressMode::AddrType::ARI,
+                         getTargetMachine().getCodeModel(),
+                         Subtarget->atLeastM68020());
 
   if (!matchAddress(N, AM)) {
     LLVM_DEBUG(dbgs() << "REJECT: Match failed\n");
@@ -1048,6 +1233,13 @@ bool M68kDAGToDAGISel::SelectARI(SDNode *Parent, SDValue N, SDValue &Base) {
   }
 
   if (AM.isPCRelative()) {
+    if (Parent && (Parent->getOpcode() == ISD::STORE ||
+                   Parent->getOpcode() == ISD::ATOMIC_STORE ||
+                   Parent->getOpcode() == ISD::ATOMIC_CMP_SWAP)) {
+      LLVM_DEBUG(dbgs() << "SUCCESS: Using PC-relative as register base for store\n");
+      Base = N;
+      return true;
+    }
     LLVM_DEBUG(dbgs() << "REJECT: Cannot match PC relative address\n");
     return false;
   }
