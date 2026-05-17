@@ -26,21 +26,16 @@ foreach size = [8, 16, 32] in {
             (!cast<MxInst>("MOV"#size#"jd") !cast<MxMemOp>("MxARI"#size):$ptr,
                                             !cast<MxRegOp>("MxDRD"#size):$val)>;
 
-  def : Pat<(!cast<SDPatternOperator>("atomic_store_"#size) !cast<MxRegOp>("MxDRD"#size):$val, MxCP_ARII:$ptr),
-            (!cast<MxInst>("MOV"#size#"fd") !cast<MxMemOp>("MxARII"#size):$ptr,
-                                            !cast<MxRegOp>("MxDRD"#size):$val)>;
-
   def : Pat<(!cast<SDPatternOperator>("atomic_store_"#size) !cast<MxRegOp>("MxDRD"#size):$val, MxCP_ARID:$ptr),
             (!cast<MxInst>("MOV"#size#"pd") !cast<MxMemOp>("MxARID"#size):$ptr,
                                             !cast<MxRegOp>("MxDRD"#size):$val)>;
 
-  def : Pat<(!cast<SDPatternOperator>("atomic_store_"#size) !cast<MxRegOp>("MxDRD"#size):$val, MxCP_PCD:$ptr),
-            (!cast<MxInst>("MOV"#size#"qd") !cast<MxMemOp>("MxPCD"#size):$ptr,
-                                            !cast<MxRegOp>("MxDRD"#size):$val)>;                                   
+  def : Pat<(!cast<SDPatternOperator>("atomic_load_"#size) iPTR:$ptr),
+            (!cast<MxInst>("MOV"#size#"dj") !cast<MxMemOp>("MxARI"#size):$ptr)>;
 
-  def : Pat<(!cast<SDPatternOperator>("atomic_store_"#size) !cast<MxRegOp>("MxDRD"#size):$val, MxCP_PCI:$ptr),
-            (!cast<MxInst>("MOV"#size#"kd") !cast<MxMemOp>("MxPCI"#size):$ptr,
-                                            !cast<MxRegOp>("MxDRD"#size):$val)>;                               
+  def : Pat<(!cast<SDPatternOperator>("atomic_store_"#size) !cast<MxRegOp>("MxDRD"#size):$val, iPTR:$ptr),
+            (!cast<MxInst>("MOV"#size#"jd") !cast<MxMemOp>("MxARI"#size):$ptr,
+                                            !cast<MxRegOp>("MxDRD"#size):$val)>;
 }
 
 let Predicates = [AtLeastM68020] in {
@@ -125,4 +120,13 @@ foreach size = [8, 16, 32] in {
                                        !cast<MxMemOp>("Mx"#mode#size):$ptr)>;
 } // size
 } // addr mode
+
+foreach size = [8, 16, 32] in {
+  def : Pat<(!cast<SDPatternOperator>("atomic_cmp_swap_i"#size) iPTR:$ptr,
+                                                                !cast<MxRegOp>("MxDRD"#size):$cmp,
+                                                                !cast<MxRegOp>("MxDRD"#size):$new),
+            (!cast<MxInst>("CASARI"#size) !cast<MxRegOp>("MxDRD"#size):$cmp,
+                                          !cast<MxRegOp>("MxDRD"#size):$new,
+                                          !cast<MxMemOp>("MxARI"#size):$ptr)>;
+}
 } // let Predicates = [AtLeastM68020]

@@ -130,21 +130,39 @@ bool M68kExpandPseudo::ExpandMI(MachineBasicBlock &MBB,
   case M68k::MOVSXd16p8:
     return TII->ExpandMOVSZX_RM(MIB, true, TII->get(M68k::MOV8dp), MVT::i16,
                                 MVT::i8);
+  case M68k::MOVSXd16p32_8:
+    return TII->ExpandMOVSZX_RM(MIB, true, TII->get(M68k::MOV8dp32), MVT::i16,
+                                MVT::i8);
   case M68k::MOVSXd32p8:
     return TII->ExpandMOVSZX_RM(MIB, true, TII->get(M68k::MOV8dp), MVT::i32,
                                 MVT::i8);
+  case M68k::MOVSXd32p32_8:
+    return TII->ExpandMOVSZX_RM(MIB, true, TII->get(M68k::MOV8dp32), MVT::i32,
+                                MVT::i8);
   case M68k::MOVSXd32p16:
     return TII->ExpandMOVSZX_RM(MIB, true, TII->get(M68k::MOV16rp), MVT::i32,
+                                MVT::i16);
+  case M68k::MOVSXd32p32_16:
+    return TII->ExpandMOVSZX_RM(MIB, true, TII->get(M68k::MOV16rp32), MVT::i32,
                                 MVT::i16);
 
   case M68k::MOVZXd16p8:
     return TII->ExpandMOVSZX_RM(MIB, false, TII->get(M68k::MOV8dp), MVT::i16,
                                 MVT::i8);
+  case M68k::MOVZXd16p32_8:
+    return TII->ExpandMOVSZX_RM(MIB, false, TII->get(M68k::MOV8dp32), MVT::i16,
+                                MVT::i8);
   case M68k::MOVZXd32p8:
     return TII->ExpandMOVSZX_RM(MIB, false, TII->get(M68k::MOV8dp), MVT::i32,
                                 MVT::i8);
+  case M68k::MOVZXd32p32_8:
+    return TII->ExpandMOVSZX_RM(MIB, false, TII->get(M68k::MOV8dp32), MVT::i32,
+                                MVT::i8);
   case M68k::MOVZXd32p16:
     return TII->ExpandMOVSZX_RM(MIB, false, TII->get(M68k::MOV16rp), MVT::i32,
+                                MVT::i16);
+  case M68k::MOVZXd32p32_16:
+    return TII->ExpandMOVSZX_RM(MIB, false, TII->get(M68k::MOV16rp32), MVT::i32,
                                 MVT::i16);
 
   case M68k::MOVSXd16f8:
@@ -170,21 +188,39 @@ bool M68kExpandPseudo::ExpandMI(MachineBasicBlock &MBB,
   case M68k::MOVSXd16q8:
     return TII->ExpandMOVSZX_RM(MIB, true, TII->get(M68k::MOV8dq), MVT::i16,
                                 MVT::i8);
+  case M68k::MOVSXd16q32_8:
+    return TII->ExpandMOVSZX_RM(MIB, true, TII->get(M68k::MOV8dq32), MVT::i16,
+                                MVT::i8);
   case M68k::MOVSXd32q8:
     return TII->ExpandMOVSZX_RM(MIB, true, TII->get(M68k::MOV8dq), MVT::i32,
                                 MVT::i8);
+  case M68k::MOVSXd32q32_8:
+    return TII->ExpandMOVSZX_RM(MIB, true, TII->get(M68k::MOV8dq32), MVT::i32,
+                                MVT::i8);
   case M68k::MOVSXd32q16:
     return TII->ExpandMOVSZX_RM(MIB, true, TII->get(M68k::MOV16dq), MVT::i32,
+                                MVT::i16);
+  case M68k::MOVSXd32q32_16:
+    return TII->ExpandMOVSZX_RM(MIB, true, TII->get(M68k::MOV16dq32), MVT::i32,
                                 MVT::i16);
 
   case M68k::MOVZXd16q8:
     return TII->ExpandMOVSZX_RM(MIB, false, TII->get(M68k::MOV8dq), MVT::i16,
                                 MVT::i8);
+  case M68k::MOVZXd16q32_8:
+    return TII->ExpandMOVSZX_RM(MIB, false, TII->get(M68k::MOV8dq32), MVT::i16,
+                                MVT::i8);
   case M68k::MOVZXd32q8:
     return TII->ExpandMOVSZX_RM(MIB, false, TII->get(M68k::MOV8dq), MVT::i32,
                                 MVT::i8);
+  case M68k::MOVZXd32q32_8:
+    return TII->ExpandMOVSZX_RM(MIB, false, TII->get(M68k::MOV8dq32), MVT::i32,
+                                MVT::i8);
   case M68k::MOVZXd32q16:
     return TII->ExpandMOVSZX_RM(MIB, false, TII->get(M68k::MOV16dq), MVT::i32,
+                                MVT::i16);
+  case M68k::MOVZXd32q32_16:
+    return TII->ExpandMOVSZX_RM(MIB, false, TII->get(M68k::MOV16dq32), MVT::i32,
                                 MVT::i16);
 
   case M68k::MOVM16jm_P:
@@ -208,6 +244,7 @@ bool M68kExpandPseudo::ExpandMI(MachineBasicBlock &MBB,
     return TII->ExpandMOVEM(MIB, TII->get(M68k::MOVM32mp), /*IsRM=*/true);
 
   case M68k::TCRETURNq:
+  case M68k::TCRETURNq32:
   case M68k::TCRETURNj: {
     MachineOperand &JumpTarget = MI.getOperand(0);
     MachineOperand &StackAdjust = MI.getOperand(1);
@@ -230,9 +267,10 @@ bool M68kExpandPseudo::ExpandMI(MachineBasicBlock &MBB,
     }
 
     // Jump to label or value in register.
-    if (Opcode == M68k::TCRETURNq) {
-      MachineInstrBuilder MIB =
-          BuildMI(MBB, MBBI, DL, TII->get(M68k::TAILJMPq));
+    if (Opcode == M68k::TCRETURNq || Opcode == M68k::TCRETURNq32) {
+      unsigned NewOpcode = (Opcode == M68k::TCRETURNq) ? M68k::TAILJMPq
+                                                       : M68k::TAILJMPq32;
+      MachineInstrBuilder MIB = BuildMI(MBB, MBBI, DL, TII->get(NewOpcode));
       if (JumpTarget.isGlobal()) {
         MIB.addGlobalAddress(JumpTarget.getGlobal(), JumpTarget.getOffset(),
                              JumpTarget.getTargetFlags());

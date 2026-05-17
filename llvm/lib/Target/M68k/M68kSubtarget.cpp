@@ -173,14 +173,17 @@ unsigned char M68kSubtarget::classifyBlockAddressReference() const {
   case CodeModel::Small:
   case CodeModel::Kernel:
   case CodeModel::Medium: {
+    if (atLeastM68020())
+      return M68kII::MO_PC_RELATIVE_ADDRESS_32;
     return M68kII::MO_PC_RELATIVE_ADDRESS;
   }
   case CodeModel::Large: {
     if (isPositionIndependent()) {
+      if (atLeastM68020())
+        return M68kII::MO_PC_RELATIVE_ADDRESS_32;
       return M68kII::MO_PC_RELATIVE_ADDRESS;
-    } else {
-      return M68kII::MO_ABSOLUTE_ADDRESS;
     }
+    return M68kII::MO_ABSOLUTE_ADDRESS;
   }
   }
 }
@@ -198,20 +201,23 @@ M68kSubtarget::classifyLocalReference(const GlobalValue *GV) const {
     if (isPositionIndependent()) {
       // On M68020 and better we can fit big any data offset into dips field.
       if (atLeastM68020()) {
-        return M68kII::MO_PC_RELATIVE_ADDRESS;
+        return M68kII::MO_PC_RELATIVE_ADDRESS_32;
       }
       // Otherwise we could check the data size and make sure it will fit into
       // 16 bit offset. For now we will be conservative and go with @GOTOFF
       return M68kII::MO_GOTOFF;
     } else {
       if (atLeastM68020()) {
-        return M68kII::MO_PC_RELATIVE_ADDRESS;
+        return M68kII::MO_PC_RELATIVE_ADDRESS_32;
       }
       return M68kII::MO_ABSOLUTE_ADDRESS;
     }
   }
   case CodeModel::Large: {
     if (isPositionIndependent()) {
+      if (atLeastM68020()) {
+        return M68kII::MO_PC_RELATIVE_ADDRESS_32;
+      }
       return M68kII::MO_GOTOFF;
     } else {
       return M68kII::MO_ABSOLUTE_ADDRESS;
@@ -237,6 +243,20 @@ M68kSubtarget::classifyGlobalReference(const GlobalValue *GV) const {
 
 unsigned char M68kSubtarget::classifyGlobalReference(const GlobalValue *GV,
                                                      const Module &M) const {
+  if (GV && GV->isThreadLocal()) {
+    TLSModel::Model Model = TM.getTLSModel(GV);
+    switch (Model) {
+    case TLSModel::GeneralDynamic:
+      return M68kII::MO_TLSGD;
+    case TLSModel::LocalDynamic:
+      return M68kII::MO_TLSLD;
+    case TLSModel::InitialExec:
+      return M68kII::MO_TLSIE;
+    case TLSModel::LocalExec:
+      return M68kII::MO_TLSLE;
+    }
+  }
+
   if (TM.shouldAssumeDSOLocal(GV))
     return classifyLocalReference(GV);
 
@@ -254,13 +274,16 @@ unsigned char M68kSubtarget::classifyGlobalReference(const GlobalValue *GV,
       return M68kII::MO_GOTPCREL;
 
     if (atLeastM68020())
-      return M68kII::MO_PC_RELATIVE_ADDRESS;
+      return M68kII::MO_PC_RELATIVE_ADDRESS_32;
 
     return M68kII::MO_ABSOLUTE_ADDRESS;
   }
   case CodeModel::Large: {
     if (isPositionIndependent())
-      return M68kII::MO_GOTOFF;
+      return M68kII::MO_GOTPCREL;
+
+    if (atLeastM68020())
+      return M68kII::MO_PC_RELATIVE_ADDRESS_32;
 
     return M68kII::MO_ABSOLUTE_ADDRESS;
   }
@@ -293,8 +316,13 @@ unsigned char
 M68kSubtarget::classifyGlobalFunctionReference(const GlobalValue *GV,
                                                const Module &M) const {
   // local always use pc-rel referencing
-  if (TM.shouldAssumeDSOLocal(GV))
+  if (TM.shouldAssumeDSOLocal(GV)) {
+    if (atLeastM68020() &&
+        (TM.getCodeModel() == CodeModel::Medium ||
+         TM.getCodeModel() == CodeModel::Large))
+      return M68kII::MO_PC_RELATIVE_ADDRESS_32;
     return M68kII::MO_NO_FLAG;
+  }
 
   // If the function is marked as non-lazy, generate an indirect call
   // which loads from the GOT directly. This avoids run-time overhead

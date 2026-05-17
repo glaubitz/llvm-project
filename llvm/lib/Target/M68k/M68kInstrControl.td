@@ -139,6 +139,10 @@ class MxJMP<MxOperand LOCOp, MxEncMemOp DST_ENC>
 }
 
 def JMP32j : MxJMP<MxARI32, MxEncAddrMode_j<"dst">>;
+def JMP32q : MxJMP<MxPCD32, MxEncAddrMode_q<"dst">>;
+
+let Predicates = [AtLeastM68020] in
+def JMP32q32 : MxJMP<MxPCD32Long, MxEncAddrMode_q32<"dst">>;
 
 
 // FIXME Support 16 bit indirect jump.
@@ -293,21 +297,25 @@ class MxCall<MxOperand LOCOp, MxEncMemOp DST_ENC>
 
 def CALLk : MxCall<MxPCI32, MxEncAddrMode_k<"dst">>;
 def CALLq : MxCall<MxPCD32, MxEncAddrMode_q<"dst">>;
+
+let Predicates = [AtLeastM68020] in
+def CALLq32 : MxCall<MxPCD32Long, MxEncAddrMode_q32<"dst">>;
 def CALLf : MxCall<MxARII32, MxEncAddrMode_f<"dst">>;
 def CALLp : MxCall<MxARID32, MxEncAddrMode_p<"dst">>;
 def CALLb : MxCall<MxAL32,  MxEncAddrMode_abs<"dst", true>>;
 def CALLj : MxCall<MxARI32, MxEncAddrMode_j<"dst">>;
 
-multiclass CallPat<MxCall callOp, Predicate pred> {
-  let Predicates = [pred] in {
+multiclass CallPat<MxCall callOp, list<Predicate> preds> {
+  let Predicates = preds in {
     def : Pat<(MxCall (i32 tglobaladdr:$dst)),  (callOp tglobaladdr:$dst)>;
     def : Pat<(MxCall (i32 texternalsym:$dst)), (callOp texternalsym:$dst)>;
     def : Pat<(MxCall (i32 imm:$dst)),          (callOp imm:$dst)>;
   }
 }
 
-defm : CallPat<CALLq, IsPIC>;
-defm : CallPat<CALLb, IsNotPIC>;
+defm : CallPat<CALLq32, [IsPIC, AtLeastM68020, FarData]>;
+defm : CallPat<CALLq,  [IsPIC]>;
+defm : CallPat<CALLb, [IsNotPIC]>;
 
 def : Pat<(MxCall iPTR:$dst), (CALLj MxARI32:$dst)>;
 
@@ -322,6 +330,10 @@ let isCall = 1, isTerminator = 1, isBarrier = 1 in {
 let isReturn = 1 in
 def TCRETURNq : MxPseudo<(outs), (ins MxPCD32:$dst,    i32imm:$adj)>;
 def TAILJMPq  : MxPseudo<(outs), (ins MxPCD32:$dst)>;
+
+let isReturn = 1 in
+def TCRETURNq32 : MxPseudo<(outs), (ins MxPCD32Long:$dst, i32imm:$adj)>;
+def TAILJMPq32  : MxPseudo<(outs), (ins MxPCD32Long:$dst)>;
 
 // NOTE j does not mean load and jump M68k jmp just calculates EA and jumps
 // and it is using Mem form like (An) thus j letter.

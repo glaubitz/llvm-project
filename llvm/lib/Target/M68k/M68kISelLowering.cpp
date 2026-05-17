@@ -778,40 +778,39 @@ SDValue M68kTargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
     InGlue = Chain.getValue(1);
   }
 
+  unsigned char OpFlags = 0;
   if (Callee->getOpcode() == ISD::GlobalAddress) {
-    // If the callee is a GlobalAddress node (quite common, every direct call
-    // is) turn it into a TargetGlobalAddress node so that legalize doesn't hack
-    // it.
     GlobalAddressSDNode *G = cast<GlobalAddressSDNode>(Callee);
-
-    // We should use extra load for direct calls to dllimported functions in
-    // non-JIT mode.
     const GlobalValue *GV = G->getGlobal();
     if (!GV->hasDLLImportStorageClass()) {
-      unsigned char OpFlags = Subtarget.classifyGlobalFunctionReference(GV);
-
+      OpFlags = Subtarget.classifyGlobalFunctionReference(GV);
       Callee = DAG.getTargetGlobalAddress(
           GV, DL, getPointerTy(DAG.getDataLayout()), G->getOffset(), OpFlags);
-
-      if (OpFlags == M68kII::MO_GOTPCREL) {
-
-        // Add a wrapper.
-        Callee = DAG.getNode(M68kISD::WrapperPC, DL,
-                             getPointerTy(DAG.getDataLayout()), Callee);
-
-        // Add extra indirection
-        Callee = DAG.getLoad(
-            getPointerTy(DAG.getDataLayout()), DL, DAG.getEntryNode(), Callee,
-            MachinePointerInfo::getGOT(DAG.getMachineFunction()));
-      }
     }
   } else if (ExternalSymbolSDNode *S = dyn_cast<ExternalSymbolSDNode>(Callee)) {
     const Module *Mod = DAG.getMachineFunction().getFunction().getParent();
-    unsigned char OpFlags =
-        Subtarget.classifyGlobalFunctionReference(nullptr, *Mod);
-
+    OpFlags = Subtarget.classifyGlobalFunctionReference(nullptr, *Mod);
     Callee = DAG.getTargetExternalSymbol(
         S->getSymbol(), getPointerTy(DAG.getDataLayout()), OpFlags);
+  }
+
+  if (M68kII::isPCRelGlobalReference(OpFlags)) {
+    unsigned WrapperKind = M68kISD::WrapperPC;
+    if (Subtarget.atLeastM68020() &&
+        (TM.getCodeModel() == CodeModel::Medium ||
+         TM.getCodeModel() == CodeModel::Large))
+      WrapperKind = M68kISD::WrapperPC32;
+
+    // Add a wrapper.
+    Callee = DAG.getNode(WrapperKind, DL, getPointerTy(DAG.getDataLayout()),
+                         Callee);
+
+    if (OpFlags == M68kII::MO_GOTPCREL) {
+      // Add extra indirection
+      Callee = DAG.getLoad(
+          getPointerTy(DAG.getDataLayout()), DL, DAG.getEntryNode(), Callee,
+          MachinePointerInfo::getGOT(DAG.getMachineFunction()));
+    }
   }
 
   SmallVector<SDValue, 8> Ops;
@@ -2657,7 +2656,12 @@ SDValue M68kTargetLowering::LowerConstantPool(SDValue Op,
 
   unsigned WrapperKind = M68kISD::Wrapper;
   if (M68kII::isPCRelGlobalReference(OpFlag)) {
-    WrapperKind = M68kISD::WrapperPC;
+    if (Subtarget.atLeastM68020() &&
+        (TM.getCodeModel() == CodeModel::Medium ||
+         TM.getCodeModel() == CodeModel::Large))
+      WrapperKind = M68kISD::WrapperPC32;
+    else
+      WrapperKind = M68kISD::WrapperPC;
   }
 
   MVT PtrVT = getPointerTy(DAG.getDataLayout());
@@ -2679,7 +2683,14 @@ SDValue M68kTargetLowering::LowerConstantPool(SDValue Op,
 
 SDValue M68kTargetLowering::LowerExternalSymbol(SDValue Op,
                                                 SelectionDAG &DAG) const {
+  SDLoc DL(Op);
+  auto PtrVT = getPointerTy(DAG.getDataLayout());
   const char *Sym = cast<ExternalSymbolSDNode>(Op)->getSymbol();
+
+  // Short-circuit GOT base
+  if (Sym && StringRef(Sym) == "_GLOBAL_OFFSET_TABLE_") {
+    return DAG.getNode(M68kISD::GLOBAL_BASE_REG, DL, PtrVT);
+  }
 
   // In PIC mode (unless we're in PCRel PIC mode) we add an offset to the
   // global base reg.
@@ -2688,13 +2699,16 @@ SDValue M68kTargetLowering::LowerExternalSymbol(SDValue Op,
 
   unsigned WrapperKind = M68kISD::Wrapper;
   if (M68kII::isPCRelGlobalReference(OpFlag)) {
-    WrapperKind = M68kISD::WrapperPC;
+    if (Subtarget.atLeastM68020() &&
+        (TM.getCodeModel() == CodeModel::Medium ||
+         TM.getCodeModel() == CodeModel::Large))
+      WrapperKind = M68kISD::WrapperPC32;
+    else
+      WrapperKind = M68kISD::WrapperPC;
   }
 
-  auto PtrVT = getPointerTy(DAG.getDataLayout());
   SDValue Result = DAG.getTargetExternalSymbol(Sym, PtrVT, OpFlag);
 
-  SDLoc DL(Op);
   Result = DAG.getNode(WrapperKind, DL, PtrVT, Result);
 
   // With PIC, the address is actually $g + Offset.
@@ -2725,8 +2739,13 @@ SDValue M68kTargetLowering::LowerBlockAddress(SDValue Op,
   // Create the TargetBlockAddressAddress node.
   SDValue Result = DAG.getTargetBlockAddress(BA, PtrVT, Offset, OpFlags);
 
-  if (M68kII::isPCRelBlockReference(OpFlags)) {
-    Result = DAG.getNode(M68kISD::WrapperPC, DL, PtrVT, Result);
+  if (M68kII::isPCRelGlobalReference(OpFlags)) {
+    if (Subtarget.atLeastM68020() &&
+        (TM.getCodeModel() == CodeModel::Medium ||
+         TM.getCodeModel() == CodeModel::Large))
+      Result = DAG.getNode(M68kISD::WrapperPC32, DL, PtrVT, Result);
+    else
+      Result = DAG.getNode(M68kISD::WrapperPC, DL, PtrVT, Result);
   } else {
     Result = DAG.getNode(M68kISD::Wrapper, DL, PtrVT, Result);
   }
@@ -2744,8 +2763,14 @@ SDValue M68kTargetLowering::LowerBlockAddress(SDValue Op,
 SDValue M68kTargetLowering::LowerGlobalAddress(const GlobalValue *GV,
                                                const SDLoc &DL, int64_t Offset,
                                                SelectionDAG &DAG) const {
-  unsigned char OpFlags = Subtarget.classifyGlobalReference(GV);
   auto PtrVT = getPointerTy(DAG.getDataLayout());
+
+  // Short-circuit GOT base
+  if (GV->getName() == "_GLOBAL_OFFSET_TABLE_") {
+    return DAG.getNode(M68kISD::GLOBAL_BASE_REG, DL, PtrVT);
+  }
+
+  unsigned char OpFlags = Subtarget.classifyGlobalReference(GV);
 
   // Create the TargetGlobalAddress node, folding in the constant
   // offset if it is legal.
@@ -2757,10 +2782,16 @@ SDValue M68kTargetLowering::LowerGlobalAddress(const GlobalValue *GV,
     Result = DAG.getTargetGlobalAddress(GV, DL, PtrVT, 0, OpFlags);
   }
 
-  if (M68kII::isPCRelGlobalReference(OpFlags))
-    Result = DAG.getNode(M68kISD::WrapperPC, DL, PtrVT, Result);
-  else
+  if (M68kII::isPCRelGlobalReference(OpFlags)) {
+    if (Subtarget.atLeastM68020() &&
+        (TM.getCodeModel() == CodeModel::Medium ||
+         TM.getCodeModel() == CodeModel::Large))
+      Result = DAG.getNode(M68kISD::WrapperPC32, DL, PtrVT, Result);
+    else
+      Result = DAG.getNode(M68kISD::WrapperPC, DL, PtrVT, Result);
+  } else {
     Result = DAG.getNode(M68kISD::Wrapper, DL, PtrVT, Result);
+  }
 
   // With PIC, the address is actually $g + Offset.
   if (M68kII::isGlobalRelativeToPICBase(OpFlags)) {
@@ -2807,7 +2838,12 @@ SDValue M68kTargetLowering::LowerJumpTable(SDValue Op,
 
   unsigned WrapperKind = M68kISD::Wrapper;
   if (M68kII::isPCRelGlobalReference(OpFlag)) {
-    WrapperKind = M68kISD::WrapperPC;
+    if (Subtarget.atLeastM68020() &&
+        (TM.getCodeModel() == CodeModel::Medium ||
+         TM.getCodeModel() == CodeModel::Large))
+      WrapperKind = M68kISD::WrapperPC32;
+    else
+      WrapperKind = M68kISD::WrapperPC;
   }
 
   auto PtrVT = getPointerTy(DAG.getDataLayout());

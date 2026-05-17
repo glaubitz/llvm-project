@@ -141,35 +141,45 @@ unsigned M68kELFObjectWriter::getRelocType(const MCFixup &Fixup,
       return IsPCRel ? ELF::R_68K_PC8 : ELF::R_68K_8;
     }
     llvm_unreachable("Unrecognized size");
+  case M68k::S_GOT:
+    switch (Type) {
+    case RT_32:
+      return ELF::R_68K_GOT32O;
+    case RT_16:
+      return ELF::R_68K_GOT16O;
+    case RT_8:
+      return ELF::R_68K_GOT8O;
+    }
+    llvm_unreachable("Unrecognized size");
   case M68k::S_GOTPCREL:
     switch (Type) {
     case RT_32:
-      return ELF::R_68K_GOTPCREL32;
+      return ELF::R_68K_GOT32;
     case RT_16:
-      return ELF::R_68K_GOTPCREL16;
+      return ELF::R_68K_GOT16;
     case RT_8:
-      return ELF::R_68K_GOTPCREL8;
+      return ELF::R_68K_GOT8;
     }
     llvm_unreachable("Unrecognized size");
   case M68k::S_GOTOFF:
     assert(!IsPCRel);
     switch (Type) {
     case RT_32:
-      return ELF::R_68K_GOTOFF32;
+      return ELF::R_68K_GOT32O;
     case RT_16:
-      return ELF::R_68K_GOTOFF16;
+      return ELF::R_68K_GOT16O;
     case RT_8:
-      return ELF::R_68K_GOTOFF8;
+      return ELF::R_68K_GOT8O;
     }
     llvm_unreachable("Unrecognized size");
   case M68k::S_PLT:
     switch (Type) {
     case RT_32:
-      return ELF::R_68K_PLT32;
+      return IsPCRel ? ELF::R_68K_PLT32 : ELF::R_68K_PLT32O;
     case RT_16:
-      return ELF::R_68K_PLT16;
+      return IsPCRel ? ELF::R_68K_PLT16 : ELF::R_68K_PLT16O;
     case RT_8:
-      return ELF::R_68K_PLT8;
+      return IsPCRel ? ELF::R_68K_PLT8 : ELF::R_68K_PLT8O;
     }
     llvm_unreachable("Unrecognized size");
   }

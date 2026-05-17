@@ -163,7 +163,7 @@ DecodeStatus M68kDisassembler::getInstruction(MCInst &Instr, uint64_t &Size,
   // If we don't do this, disassembler may generate result even
   // the encoding is invalid. We need to let it fail correctly.
   Size = 2;
-  Result = decodeInstruction(DecoderTable80, Instr, Insn, Address, this, STI,
+  Result = decodeInstruction(DecoderTable96, Instr, Insn, Address, this, STI,
                              MakeUp);
   if (Result == DecodeStatus::Success)
     Size = InstrLenTable[Instr.getOpcode()] >> 3;
