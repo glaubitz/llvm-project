@@ -128,6 +128,23 @@ class MxEncAddrMode_q<string opnd_name> : MxEncMemOp {
                             (encoder "encodePCRelImm<16>"));
 }
 
+class MxEncAddrMode_q32<string opnd_name> : MxEncMemOp {
+  let EA = (descend /*MODE*/0b111,
+                     /*REGISTER*/0b011);
+
+  // Full Extension Word: 0x0170
+  // - Bit 8: Full format indicator (1)
+  // - Bit 7: BS = 0 (use PC base)
+  // - Bit 6: IS = 1 (suppress index)
+  // - Bits 5-4: BD Size = 11 (32-bit)
+  // - Bits 2-0: No memory indirect
+  let Supplement = (ascend
+    (descend 0b0000, 0b0, 0b00, 0b1, 0b0, 0b1, 0b11, 0b0, 0b000),
+    (operand "$"#opnd_name, 32, (encoder "encodePCRelImm<32>"),
+                                (decoder "DecodeImm32"))
+  );
+}
+
 class MxEncAddrMode_p<string opnd_name> : MxEncMemOp {
   let EA = (descend /*MODE*/0b101,
                      /*REGISTER*/(operand "$"#opnd_name#".reg", 3));
@@ -135,6 +152,23 @@ class MxEncAddrMode_p<string opnd_name> : MxEncMemOp {
   // 16-bit Displacement
   let Supplement = (operand "$"#opnd_name#".disp", 16,
                             (encoder "encodeRelocImm<16>"));
+}
+
+class MxEncAddrMode_p32<string opnd_name> : MxEncMemOp {
+  let EA = (descend /*MODE*/0b110,
+                     /*REGISTER*/(operand "$"#opnd_name#".reg", 3));
+
+  // Full Extension Word: 0x0170
+  // - Bit 8: Full format indicator (1)
+  // - Bit 7: BS = 0 (use An base)
+  // - Bit 6: IS = 1 (suppress index)
+  // - Bits 5-4: BD Size = 11 (32-bit)
+  // - Bits 2-0: No memory indirect
+  let Supplement = (ascend
+    (descend 0b0000, 0b0, 0b00, 0b1, 0b0, 0b1, 0b11, 0b0, 0b000),
+    (operand "$"#opnd_name#".disp", 32, (encoder "encodeRelocImm<32>"),
+                                        (decoder "DecodeImm32"))
+  );
 }
 
 class MxEncAddrMode_f<string opnd_name> : MxEncMemOp {

@@ -134,6 +134,10 @@ enum TOF {
   /// address of the symbol.
   MO_PC_RELATIVE_ADDRESS,
 
+  /// On a symbol operand this indicates that the immediate is the 32-bit
+  /// pc-relative address of the symbol.
+  MO_PC_RELATIVE_ADDRESS_32,
+
   /// On a symbol operand this indicates that the immediate is the offset to
   /// the GOT entry for the symbol name from the base of the GOT.
   ///
@@ -211,6 +215,7 @@ inline static bool isDirectGlobalReference(unsigned char Flag) {
   case M68kII::MO_NO_FLAG:
   case M68kII::MO_ABSOLUTE_ADDRESS:
   case M68kII::MO_PC_RELATIVE_ADDRESS:
+  case M68kII::MO_PC_RELATIVE_ADDRESS_32:
     return true;
   }
 }
@@ -235,6 +240,8 @@ inline static bool isPCRelGlobalReference(unsigned char Flag) {
     return false;
   case M68kII::MO_GOTPCREL:
   case M68kII::MO_PC_RELATIVE_ADDRESS:
+  case M68kII::MO_PC_RELATIVE_ADDRESS_32:
+  case M68kII::MO_PLT:
     return true;
   }
 }
@@ -245,6 +252,7 @@ inline static bool isPCRelBlockReference(unsigned char Flag) {
   default:
     return false;
   case M68kII::MO_PC_RELATIVE_ADDRESS:
+  case M68kII::MO_PC_RELATIVE_ADDRESS_32:
     return true;
   }
 }

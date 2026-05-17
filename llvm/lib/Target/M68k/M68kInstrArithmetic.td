@@ -209,11 +209,25 @@ multiclass MxBiArOp_DF<string MN, SDNode NODE, bit isComm,
                                       !cast<MxType>("MxType"#SZ).QPat,
                                       CMD, MxEncAddrMode_q<"opd">>;
 
+    let Predicates = [AtLeastM68020] in
+    def NAME#SZ#"dq32" : MxBiArOp_R_RM<MN, NODE,
+                                       !cast<MxType>("MxType"#SZ#"d"),
+                                       MxPCD32Long,
+                                       MxCP_PCD32,
+                                       CMD, MxEncAddrMode_q32<"opd">>;
+
     def NAME#SZ#"dp"  : MxBiArOp_R_RM<MN, NODE,
                                       !cast<MxType>("MxType"#SZ#"d"),
                                       !cast<MxType>("MxType"#SZ).POp,
                                       !cast<MxType>("MxType"#SZ).PPat,
                                       CMD, MxEncAddrMode_p<"opd">>;
+
+    let Predicates = [AtLeastM68020] in
+    def NAME#SZ#"dp32" : MxBiArOp_R_RM<MN, NODE,
+                                       !cast<MxType>("MxType"#SZ#"d"),
+                                       MxARID32Long,
+                                       MxCP_ARID32,
+                                       CMD, MxEncAddrMode_p32<"opd">>;
 
     def NAME#SZ#"df"  : MxBiArOp_R_RM<MN, NODE,
                                       !cast<MxType>("MxType"#SZ#"d"),
@@ -236,6 +250,12 @@ multiclass MxBiArOp_DF<string MN, SDNode NODE, bit isComm,
                                     !cast<MxType>("MxType"#SZ).POp,
                                     CMD, MxEncAddrMode_p<"dst">>;
 
+    let Predicates = [AtLeastM68020] in
+    def NAME#SZ#"p32d" : MxBiArOp_MR<MN,
+                                     !cast<MxType>("MxType"#SZ#"d"),
+                                     MxARID32Long,
+                                     CMD, MxEncAddrMode_p32<"dst">>;
+
     def NAME#SZ#"fd"  : MxBiArOp_MR<MN,
                                     !cast<MxType>("MxType"#SZ#"d"),
                                     !cast<MxType>("MxType"#SZ).FOp,
@@ -250,6 +270,12 @@ multiclass MxBiArOp_DF<string MN, SDNode NODE, bit isComm,
                                     !cast<MxType>("MxType"#SZ),
                                     !cast<MxType>("MxType"#SZ).POp,
                                     CMDI, MxEncAddrMode_p<"dst">>;
+
+    let Predicates = [AtLeastM68020] in
+    def NAME#SZ#"p32i" : MxBiArOp_MI<MN,
+                                     !cast<MxType>("MxType"#SZ),
+                                     MxARID32Long,
+                                     CMDI, MxEncAddrMode_p32<"dst">>;
 
     def NAME#SZ#"fi"  : MxBiArOp_MI<MN,
                                     !cast<MxType>("MxType"#SZ),
@@ -287,6 +313,9 @@ multiclass MxBiArOp_AF<string MN, SDNode NODE, bits<4> CMD> {
                                   CMD, MxEncAddrMode_k<"opd">>;
   def NAME#"32aq" : MxBiArOp_R_RM<MN, NODE, MxType32a, MxType32.QOp, MxType32.QPat,
                                   CMD, MxEncAddrMode_q<"opd">>;
+  let Predicates = [AtLeastM68020] in
+  def NAME#"32aq32" : MxBiArOp_R_RM<MN, NODE, MxType32a, MxPCD32Long, MxCP_PCD32,
+                                    CMD, MxEncAddrMode_q32<"opd">>;
   def NAME#"32af" : MxBiArOp_R_RM<MN, NODE, MxType32a, MxType32.FOp, MxType32.FPat,
                                   CMD, MxEncAddrMode_f<"opd">>;
   def NAME#"32ap" : MxBiArOp_R_RM<MN, NODE, MxType32a, MxType32.POp, MxType32.PPat,
@@ -485,7 +514,11 @@ class MxCmp_RM<MxType TYPE, MxOperand MEMOpd, ComplexPattern MEMPat,
 multiclass MMxCmp_RM<MxType TYPE> {
   def NAME#TYPE.KOp.Letter : MxCmp_RM<TYPE, TYPE.KOp, TYPE.KPat, MxEncAddrMode_k<"mem">>;
   def NAME#TYPE.QOp.Letter : MxCmp_RM<TYPE, TYPE.QOp, TYPE.QPat, MxEncAddrMode_q<"mem">>;
+  let Predicates = [AtLeastM68020] in
+  def NAME#"q32" : MxCmp_RM<TYPE, MxPCD32Long, MxCP_PCD32, MxEncAddrMode_q32<"mem">>;
   def NAME#TYPE.POp.Letter : MxCmp_RM<TYPE, TYPE.POp, TYPE.PPat, MxEncAddrMode_p<"mem">>;
+  let Predicates = [AtLeastM68020] in
+  def NAME#"p32" : MxCmp_RM<TYPE, MxARID32Long, MxCP_ARID32, MxEncAddrMode_p32<"mem">>;
   def NAME#TYPE.FOp.Letter : MxCmp_RM<TYPE, TYPE.FOp, TYPE.FPat, MxEncAddrMode_f<"mem">>;
   def NAME#TYPE.JOp.Letter : MxCmp_RM<TYPE, TYPE.JOp, TYPE.JPat, MxEncAddrMode_j<"mem">>;
 }
@@ -495,8 +528,14 @@ multiclass MMxCmp_MI<MxType TYPE> {
                                           MxEncAddrMode_k<"mem">>;
   def NAME#TYPE.QOp.Letter#"i" : MxCmp_MI<TYPE, TYPE.QOp, TYPE.QPat,
                                           MxEncAddrMode_q<"mem">>;
+  let Predicates = [AtLeastM68020] in
+  def NAME#"q32i" : MxCmp_MI<TYPE, MxPCD32Long, MxCP_PCD32,
+                              MxEncAddrMode_q32<"mem">>;
   def NAME#TYPE.POp.Letter#"i" : MxCmp_MI<TYPE, TYPE.POp, TYPE.PPat,
                                           MxEncAddrMode_p<"mem">>;
+  let Predicates = [AtLeastM68020] in
+  def NAME#"p32i" : MxCmp_MI<TYPE, MxARID32Long, MxCP_ARID32,
+                              MxEncAddrMode_p32<"mem">>;
   def NAME#TYPE.FOp.Letter#"i" : MxCmp_MI<TYPE, TYPE.FOp, TYPE.FPat,
                                           MxEncAddrMode_f<"mem">>;
   def NAME#TYPE.JOp.Letter#"i" : MxCmp_MI<TYPE, TYPE.JOp, TYPE.JPat,

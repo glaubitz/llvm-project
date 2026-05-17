@@ -115,6 +115,9 @@ def MxTCRet : SDNode<"M68kISD::TC_RETURN", MxSDT_TCRet,
 def MxGlobalBaseReg : SDNode<"M68kISD::GLOBAL_BASE_REG",
                              SDTypeProfile<1, 0, [SDTCisVT<0, iPTR>]>>;
 
+def MxGOT : SDNode<"ISD::GLOBAL_OFFSET_TABLE",
+                   SDTypeProfile<1, 0, [SDTCisVT<0, iPTR>]>>;
+
 // A wrapper node for TargetConstantPool,
 // TargetExternalSymbol, and TargetGlobalAddress.
 def MxWrapper   : SDNode<"M68kISD::Wrapper",   MxSDT_Wrapper>;
@@ -122,6 +125,10 @@ def MxWrapper   : SDNode<"M68kISD::Wrapper",   MxSDT_Wrapper>;
 // Special wrapper used under M68k PIC mode for PC
 // relative displacements.
 def MxWrapperPC : SDNode<"M68kISD::WrapperPC", MxSDT_Wrapper>;
+
+// Special wrapper used under M68k PIC mode for 32-bit PC
+// relative displacements.
+def MxWrapperPC32 : SDNode<"M68kISD::WrapperPC32", MxSDT_Wrapper>;
 
 // Arithmetic operations with CCR results.
 def MxAdd  : SDNode<"M68kISD::ADD",  MxSDT_BiArithCCROut, [SDNPCommutative]>;
@@ -335,6 +342,8 @@ foreach size = ["8", "16", "32"] in {
   def MxARID # size # _TC : MxMemOp<(ops i16imm:$disp, AR32_TC:$reg), ResSize, "p", "printARID"#size#"Mem", MxARID>;
 } // foreach size
 
+def MxARID32Long : MxMemOp<(ops i32imm:$disp, AR32:$reg), MxSize32, "p32", "printARID32Mem", MxARID>;
+
 // ADDRESS REGISTER INDIRECT WITH INDEX. This addressing mode requires one word
 // of extension. The address of the operand is the sum of the address in the
 // address register, the signextended displacement integer in the low order eight
@@ -396,6 +405,8 @@ def MxPCD # size : MxMemOp<(ops i16imm), ResSize,  "q", "printPCD"#size#"Mem", M
 // a program reference.
 def MxPCI # size : MxMemOp<(ops i8imm:$disp, XR32:$index), ResSize,  "k", "printPCI"#size#"Mem", MxPCI>;
 } // foreach size
+
+def MxPCD32Long : MxMemOp<(ops i32imm), MxSize32, "q32", "printPCD32Mem", MxPCD>;
 } // OPERAND_PCREL
 
 def MxImm : AsmOperandClass {
@@ -514,6 +525,9 @@ let WantsParent = true in {
   def MxCP_ARID  : ComplexPattern<iPTR, 2, "SelectARID",
                                   [add, sub, mul, or, shl, frameindex]>;
 
+  def MxCP_ARID32 : ComplexPattern<iPTR, 2, "SelectARID32",
+                                   [add, sub, mul, or, shl, frameindex]>;
+
   def MxCP_ARII  : ComplexPattern<iPTR, 3, "SelectARII",
                                   [add, sub, mul, or, shl, frameindex]>;
 
@@ -521,7 +535,12 @@ let WantsParent = true in {
                                   [add, sub, mul, or, shl]>;
 
   def MxCP_PCD   : ComplexPattern<iPTR, 1, "SelectPCD",
-                                  [add, sub, mul, or, shl]>;
+                                  [add, sub, mul, or, shl,
+                                   MxWrapperPC, MxGOT]>;
+
+  def MxCP_PCD32 : ComplexPattern<iPTR, 1, "SelectPCD32",
+                                  [add, sub, mul, or, shl,
+                                   MxWrapperPC32, MxGOT]>;
 
   def MxCP_PCI   : ComplexPattern<iPTR, 2, "SelectPCI",
                                   [add, sub, mul, or, shl]>;
@@ -745,6 +764,12 @@ foreach size = [8, 16, 32] in {
     : MxImmOpBundle<size, !cast<MxOperand>("Mxi"#size#"imm"),
                     !cast<PatFrag>("Mxi"#size#"immSExt"#size)>;
 } // foreach size = [8, 16, 32]
+
+// (i32,PC)
+def MxOp32AddrMode_q32 : MxOpBundle<32, MxPCD32Long, MxCP_PCD32>;
+
+// (i32,An)
+def MxOp32AddrMode_p32 : MxOpBundle<32, MxARID32Long, MxCP_ARID32>;
 
 foreach size = [16, 32] in {
   // An

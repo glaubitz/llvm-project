@@ -890,6 +890,7 @@ M68kInstrInfo::getSerializableDirectMachineOperandTargetFlags() const {
   static const std::pair<unsigned, const char *> TargetFlags[] = {
       {MO_ABSOLUTE_ADDRESS, "m68k-absolute"},
       {MO_PC_RELATIVE_ADDRESS, "m68k-pcrel"},
+      {MO_PC_RELATIVE_ADDRESS_32, "m68k-pcrel-32"},
       {MO_GOT, "m68k-got"},
       {MO_GOTOFF, "m68k-gotoff"},
       {MO_GOTPCREL, "m68k-gotpcrel"},
@@ -930,7 +931,19 @@ struct M68kGlobalBaseReg : public MachineFunctionPass {
     const M68kInstrInfo *TII = STI.getInstrInfo();
 
     // Generate lea (__GLOBAL_OFFSET_TABLE_,%PC), %A5
-    BuildMI(FirstMBB, MBBI, DL, TII->get(M68k::LEA32q), GlobalBaseReg)
+    unsigned Opc = M68k::LEA32q;
+    if (STI.atLeastM68020() &&
+        STI.isPositionIndependent() &&
+        MF.getTarget().getCodeModel() != CodeModel::Small &&
+        MF.getTarget().getCodeModel() != CodeModel::Kernel) {
+      Opc = M68k::LEA32q32;
+    }
+
+    // We use a pseudo-expansion like approach here but we must be careful.
+    // The easiest way is to build the MI directly with the ExternalSymbol and 
+    // let the MCCodeEmitter handle it. However, the encoder for LEA32q/q32
+    // expects a PC-relative displacement.
+    BuildMI(FirstMBB, MBBI, DL, TII->get(Opc), GlobalBaseReg)
         .addExternalSymbol("_GLOBAL_OFFSET_TABLE_", M68kII::MO_GOTPCREL);
 
     return true;

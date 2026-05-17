@@ -87,10 +87,19 @@ class MxBIT_MI<string MN, bits<3> OPMODE, MxType TYPE,
 
 def BTST8qd : MxBIT_MR<"btst", 0b100, MxType8d, MxType8.QOp,
                         MxEncAddrMode_q<"dst">>;
+
+let Predicates = [AtLeastM68020] in
+def BTST8q32d : MxBIT_MR<"btst", 0b100, MxType8d, MxPCD32Long,
+                          MxEncAddrMode_q32<"dst">>;
+
 def BTST8kd : MxBIT_MR<"btst", 0b100, MxType8d, MxType8.KOp,
                         MxEncAddrMode_k<"dst">>;
 def BTST8qi : MxBIT_MI<"btst", 0b000, MxType8d, MxType8.QOp,
                         MxEncAddrMode_q<"dst">>;
+
+let Predicates = [AtLeastM68020] in
+def BTST8q32i : MxBIT_MI<"btst", 0b000, MxType8d, MxPCD32Long,
+                          MxEncAddrMode_q32<"dst">>;
 def BTST8ki : MxBIT_MI<"btst", 0b000, MxType8d, MxType8.KOp,
                         MxEncAddrMode_k<"dst">>;
 
@@ -149,6 +158,8 @@ def : Pat<(NODE (TYPE.Load MEMPat:$dst), TYPE.IPat:$bitno),
 
 defm : MxBITPatM<BTST8qd, BTST8qi, MxBtst,
                  MxType8d, MxType8.QOp, MxType8.QPat>;
+defm : MxBITPatM<BTST8q32d, BTST8q32i, MxBtst,
+                 MxType8d, MxPCD32Long, MxCP_PCD32>;
 defm : MxBITPatM<BTST8kd, BTST8ki, MxBtst,
                  MxType8d, MxType8.KOp, MxType8.KPat>;
 defm : MxBITPatM<BTST8jd, BTST8ji, MxBtst,

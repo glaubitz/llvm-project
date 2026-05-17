@@ -42,9 +42,14 @@ def : Pat<(store (i32 (MxWrapper tblockaddress:$src)), iPTR:$dst),
 
 def : Pat<(i32 (MxWrapperPC tconstpool    :$src)), (LEA32q tconstpool    :$src)>;
 def : Pat<(i32 (MxWrapperPC tglobaladdr   :$src)), (LEA32q tglobaladdr   :$src)>;
-def : Pat<(i32 (MxWrapperPC texternalsym  :$src)), (LEA32q texternalsym  :$src)>;
-def : Pat<(i32 (MxWrapperPC tjumptable    :$src)), (LEA32q tjumptable    :$src)>;
+def : Pat<(i32 (MxWrapperPC texternalsym :$src)), (LEA32q texternalsym :$src)>;
 def : Pat<(i32 (MxWrapperPC tblockaddress :$src)), (LEA32q tblockaddress :$src)>;
+
+def : Pat<(i32 (MxWrapperPC32 tglobaladdr   :$src)), (LEA32q32 tglobaladdr   :$src)>;
+def : Pat<(i32 (MxWrapperPC32 texternalsym :$src)), (LEA32q32 texternalsym :$src)>;
+def : Pat<(i32 (MxWrapperPC32 tblockaddress :$src)), (LEA32q32 tblockaddress :$src)>;
+def : Pat<(i32 (MxWrapperPC32 tjumptable    :$src)), (LEA32q32 tjumptable    :$src)>;
+def : Pat<(i32 (MxWrapperPC32 tconstpool    :$src)), (LEA32q32 tconstpool    :$src)>;
 
 
 //===----------------------------------------------------------------------===//
@@ -109,6 +114,14 @@ def : Pat<(MxTCRet (i32 tglobaladdr:$dst), imm:$adj),
 
 def : Pat<(MxTCRet (i32 texternalsym:$dst), imm:$adj),
           (TCRETURNq MxPCD32:$dst, imm:$adj)>;
+
+let Predicates = [AtLeastM68020, FarData] in {
+def : Pat<(MxTCRet (i32 tglobaladdr:$dst), imm:$adj),
+          (TCRETURNq32 MxPCD32Long:$dst, imm:$adj)>;
+
+def : Pat<(MxTCRet (i32 texternalsym:$dst), imm:$adj),
+          (TCRETURNq32 MxPCD32Long:$dst, imm:$adj)>;
+}
 
 
 //===----------------------------------------------------------------------===//
