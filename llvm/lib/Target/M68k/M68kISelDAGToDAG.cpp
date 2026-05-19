@@ -572,12 +572,36 @@ bool M68kDAGToDAGISel::matchAddressRecursively(SDValue N,
   case M68kISD::WrapperPC32:
     return matchWrapper(N, AM);
 
+  case M68kISD::GLOBAL_BASE_REG:
+    return matchAddressBase(SDValue(getGlobalBaseReg(), 0), AM);
+
+  case ISD::TargetGlobalAddress:
+  case ISD::TargetGlobalTLSAddress: {
+    GlobalAddressSDNode *GA = cast<GlobalAddressSDNode>(N);
+    if (AM.hasSymbolicDisplacement())
+      return false;
+    AM.GV = GA->getGlobal();
+    AM.SymbolFlags = GA->getTargetFlags();
+    return true;
+  }
+
+  case ISD::TargetExternalSymbol: {
+    ExternalSymbolSDNode *ES = cast<ExternalSymbolSDNode>(N);
+    if (AM.hasSymbolicDisplacement())
+      return false;
+    AM.ES = ES->getSymbol();
+    AM.SymbolFlags = ES->getTargetFlags();
+    return true;
+  }
+
   case ISD::GLOBAL_OFFSET_TABLE:
     if (AM.hasBase())
       return false;
     AM.setBaseReg(CurDAG->getRegister(M68k::PC, MVT::i32));
-    AM.ES = "_GLOBAL_OFFSET_TABLE_";
-    AM.SymbolFlags = M68kII::MO_GOTPCREL;
+    if (AM.SymbolFlags == M68kII::MO_NO_FLAG) {
+      AM.ES = "_GLOBAL_OFFSET_TABLE_";
+      AM.SymbolFlags = M68kII::MO_GOTPCREL;
+    }
     return true;
 
   case ISD::LOAD:
@@ -611,13 +635,6 @@ bool M68kDAGToDAGISel::matchAddressRecursively(SDValue N,
       return true;
     }
     break;
-
-  case ISD::TargetGlobalTLSAddress: {
-    GlobalAddressSDNode *GA = cast<GlobalAddressSDNode>(N);
-    AM.GV = GA->getGlobal();
-    AM.SymbolFlags = GA->getTargetFlags();
-    return true;
-  }
   }
 
   return matchAddressBase(N, AM);

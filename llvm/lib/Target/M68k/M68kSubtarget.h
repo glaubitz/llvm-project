@@ -112,23 +112,29 @@ public:
 
   /// Classify a global variable reference for the current subtarget according
   /// to how we should reference it in a non-pcrel context.
-  unsigned char classifyLocalReference(const GlobalValue *GV) const;
+  unsigned char classifyLocalReference(const GlobalValue *GV,
+                                       const char *Sym = nullptr) const;
 
   /// Classify a global variable reference for the current subtarget according
   /// to how we should reference it in a non-pcrel context.
-  unsigned char classifyGlobalReference(const GlobalValue *GV,
-                                        const Module &M) const;
+  unsigned char classifyGlobalReference(const GlobalValue *GV, const Module &M,
+                                        const char *Sym = nullptr) const;
   unsigned char classifyGlobalReference(const GlobalValue *GV) const;
 
   /// Classify a external variable reference for the current subtarget according
   /// to how we should reference it in a non-pcrel context.
-  unsigned char classifyExternalReference(const Module &M) const;
+  unsigned char classifyExternalReference(const Module &M,
+                                          const char *Sym = nullptr) const;
 
   /// Classify a global function reference for the current subtarget.
   unsigned char classifyGlobalFunctionReference(const GlobalValue *GV,
-                                                const Module &M) const;
+                                                const Module &M,
+                                                const char *Sym = nullptr) const;
   unsigned char
   classifyGlobalFunctionReference(const GlobalValue *GV) const override;
+
+  /// Return true if the given symbol name belongs to a TLS variable.
+  bool isTLSName(const char *Sym) const;
 
   /// Classify a blockaddress reference for the current subtarget according to
   /// how we should reference it in a non-pcrel context.
