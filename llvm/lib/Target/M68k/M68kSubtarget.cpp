@@ -190,6 +190,20 @@ unsigned char M68kSubtarget::classifyBlockAddressReference() const {
 
 unsigned char
 M68kSubtarget::classifyLocalReference(const GlobalValue *GV) const {
+  if (GV && GV->isThreadLocal()) {
+    TLSModel::Model Model = TM.getTLSModel(GV);
+    switch (Model) {
+    case TLSModel::LocalExec:
+      return M68kII::MO_TLSLE;
+    case TLSModel::LocalDynamic:
+      return M68kII::MO_TLSLD;
+    case TLSModel::InitialExec:
+      return M68kII::MO_TLSIE;
+    case TLSModel::GeneralDynamic:
+      return M68kII::MO_TLSGD;
+    }
+  }
+
   switch (TM.getCodeModel()) {
   default:
     llvm_unreachable("Unsupported code model");
@@ -315,6 +329,20 @@ M68kSubtarget::classifyGlobalFunctionReference(const GlobalValue *GV) const {
 unsigned char
 M68kSubtarget::classifyGlobalFunctionReference(const GlobalValue *GV,
                                                const Module &M) const {
+  if (GV && GV->isThreadLocal()) {
+    TLSModel::Model Model = TM.getTLSModel(GV);
+    switch (Model) {
+    case TLSModel::InitialExec:
+      return M68kII::MO_TLSIE;
+    case TLSModel::LocalExec:
+      return M68kII::MO_TLSLE;
+    case TLSModel::LocalDynamic:
+      return M68kII::MO_TLSLD;
+    case TLSModel::GeneralDynamic:
+      return M68kII::MO_TLSGD;
+    }
+  }
+
   // local always use pc-rel referencing
   if (TM.shouldAssumeDSOLocal(GV)) {
     if (atLeastM68020() &&
