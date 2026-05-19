@@ -2061,7 +2061,7 @@ SDValue M68kTargetLowering::EmitTest(SDValue Op, unsigned M68kCC,
       if (TLI.isOperationLegal(WideVal.getOpcode(), WideVT)) {
         SDValue V0 = DAG.getNode(ISD::TRUNCATE, DL, VT, WideVal.getOperand(0));
         SDValue V1 = DAG.getNode(ISD::TRUNCATE, DL, VT, WideVal.getOperand(1));
-        Op = DAG.getNode(ConvertedOp, DL, VT, V0, V1);
+        Op = DAG.getNode(ConvertedOp, DL, DAG.getVTList(VT, MVT::i8), V0, V1);
       }
     }
   }
