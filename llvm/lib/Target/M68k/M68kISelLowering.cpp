@@ -2765,6 +2765,13 @@ SDValue M68kTargetLowering::LowerGlobalAddress(const GlobalValue *GV,
                                                SelectionDAG &DAG) const {
   auto PtrVT = getPointerTy(DAG.getDataLayout());
 
+  if (GV->isThreadLocal()) {
+    // If we're called for a TLS global, redirect to TLS lowering.
+    // We need to wrap it back into a SelectionDAG node first.
+    SDValue Op = DAG.getGlobalAddress(GV, DL, PtrVT, Offset);
+    return LowerGlobalTLSAddress(Op, DAG);
+  }
+
   // Short-circuit GOT base
   if (GV->getName() == "_GLOBAL_OFFSET_TABLE_") {
     return DAG.getNode(M68kISD::GLOBAL_BASE_REG, DL, PtrVT);
@@ -2820,6 +2827,8 @@ SDValue M68kTargetLowering::LowerGlobalAddress(const GlobalValue *GV,
 SDValue M68kTargetLowering::LowerGlobalAddress(SDValue Op,
                                                SelectionDAG &DAG) const {
   const GlobalValue *GV = cast<GlobalAddressSDNode>(Op)->getGlobal();
+  if (GV->isThreadLocal())
+    return LowerGlobalTLSAddress(Op, DAG);
   int64_t Offset = cast<GlobalAddressSDNode>(Op)->getOffset();
   return LowerGlobalAddress(GV, SDLoc(Op), Offset, DAG);
 }
