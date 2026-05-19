@@ -33,6 +33,7 @@
 #include "llvm/IR/CallingConv.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/GlobalVariable.h"
+#include "llvm/IR/Module.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -789,7 +790,7 @@ SDValue M68kTargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
     }
   } else if (ExternalSymbolSDNode *S = dyn_cast<ExternalSymbolSDNode>(Callee)) {
     const Module *Mod = DAG.getMachineFunction().getFunction().getParent();
-    OpFlags = Subtarget.classifyGlobalFunctionReference(nullptr, *Mod);
+    OpFlags = Subtarget.classifyGlobalFunctionReference(nullptr, *Mod, S->getSymbol());
     Callee = DAG.getTargetExternalSymbol(
         S->getSymbol(), getPointerTy(DAG.getDataLayout()), OpFlags);
   }
@@ -1447,16 +1448,18 @@ SDValue M68kTargetLowering::LowerExternalSymbolCall(SelectionDAG &DAG,
 SDValue M68kTargetLowering::getTLSGetAddr(GlobalAddressSDNode *GA,
                                           SelectionDAG &DAG,
                                           unsigned TargetFlags) const {
-  SDValue GOT = DAG.getGLOBAL_OFFSET_TABLE(MVT::i32);
+  SDLoc DL(GA);
+  auto PtrVT = getPointerTy(DAG.getDataLayout());
+  SDValue GOT = DAG.getNode(M68kISD::GLOBAL_BASE_REG, DL, PtrVT);
   SDValue TGA = DAG.getTargetGlobalAddress(
-      GA->getGlobal(), GA, GA->getValueType(0), GA->getOffset(), TargetFlags);
-  SDValue Arg = DAG.getNode(ISD::ADD, SDLoc(GA), MVT::i32, GOT, TGA);
+      GA->getGlobal(), DL, PtrVT, GA->getOffset(), TargetFlags);
+  SDValue Arg = DAG.getNode(ISD::ADD, DL, PtrVT, GOT, TGA);
 
   PointerType *PtrTy = PointerType::get(*DAG.getContext(), 0);
 
   ArgListTy Args;
   Args.emplace_back(Arg, PtrTy);
-  return LowerExternalSymbolCall(DAG, SDLoc(GA), "__tls_get_addr",
+  return LowerExternalSymbolCall(DAG, DL, "__tls_get_addr",
                                  std::move(Args));
 }
 
@@ -1471,35 +1474,44 @@ SDValue M68kTargetLowering::LowerTLSGeneralDynamic(GlobalAddressSDNode *GA,
 
 SDValue M68kTargetLowering::LowerTLSLocalDynamic(GlobalAddressSDNode *GA,
                                                  SelectionDAG &DAG) const {
+  SDLoc DL(GA);
+  auto PtrVT = getPointerTy(DAG.getDataLayout());
   SDValue Addr = getTLSGetAddr(GA, DAG, M68kII::MO_TLSLDM);
   SDValue TGA =
-      DAG.getTargetGlobalAddress(GA->getGlobal(), GA, GA->getValueType(0),
+      DAG.getTargetGlobalAddress(GA->getGlobal(), DL, PtrVT,
                                  GA->getOffset(), M68kII::MO_TLSLD);
-  return DAG.getNode(ISD::ADD, SDLoc(GA), MVT::i32, TGA, Addr);
+  TGA = DAG.getNode(M68kISD::Wrapper, DL, PtrVT, TGA);
+  return DAG.getNode(ISD::ADD, DL, PtrVT, TGA, Addr);
 }
 
 SDValue M68kTargetLowering::LowerTLSInitialExec(GlobalAddressSDNode *GA,
                                                 SelectionDAG &DAG) const {
-  SDValue GOT = DAG.getGLOBAL_OFFSET_TABLE(MVT::i32);
-  SDValue Tp = getM68kReadTp(SDLoc(GA), DAG);
+  SDLoc DL(GA);
+  auto PtrVT = getPointerTy(DAG.getDataLayout());
+  SDValue GOT = DAG.getNode(M68kISD::GLOBAL_BASE_REG, DL, PtrVT);
+  SDValue Tp = getM68kReadTp(DL, DAG);
   SDValue TGA =
-      DAG.getTargetGlobalAddress(GA->getGlobal(), GA, GA->getValueType(0),
+      DAG.getTargetGlobalAddress(GA->getGlobal(), DL, PtrVT,
                                  GA->getOffset(), M68kII::MO_TLSIE);
-  SDValue Addr = DAG.getNode(ISD::ADD, SDLoc(GA), MVT::i32, TGA, GOT);
+  TGA = DAG.getNode(M68kISD::Wrapper, DL, PtrVT, TGA);
+  SDValue Addr = DAG.getNode(ISD::ADD, DL, PtrVT, TGA, GOT);
   SDValue Offset =
-      DAG.getLoad(MVT::i32, SDLoc(GA), DAG.getEntryNode(), Addr,
+      DAG.getLoad(PtrVT, DL, DAG.getEntryNode(), Addr,
                   MachinePointerInfo::getGOT(DAG.getMachineFunction()));
 
-  return DAG.getNode(ISD::ADD, SDLoc(GA), MVT::i32, Offset, Tp);
+  return DAG.getNode(ISD::ADD, DL, PtrVT, Offset, Tp);
 }
 
 SDValue M68kTargetLowering::LowerTLSLocalExec(GlobalAddressSDNode *GA,
                                               SelectionDAG &DAG) const {
-  SDValue Tp = getM68kReadTp(SDLoc(GA), DAG);
+  SDLoc DL(GA);
+  auto PtrVT = getPointerTy(DAG.getDataLayout());
+  SDValue Tp = getM68kReadTp(DL, DAG);
   SDValue TGA =
-      DAG.getTargetGlobalAddress(GA->getGlobal(), GA, GA->getValueType(0),
+      DAG.getTargetGlobalAddress(GA->getGlobal(), DL, PtrVT,
                                  GA->getOffset(), M68kII::MO_TLSLE);
-  return DAG.getNode(ISD::ADD, SDLoc(GA), MVT::i32, TGA, Tp);
+  TGA = DAG.getNode(M68kISD::Wrapper, DL, PtrVT, TGA);
+  return DAG.getNode(ISD::ADD, DL, PtrVT, TGA, Tp);
 }
 
 SDValue M68kTargetLowering::LowerGlobalTLSAddress(SDValue Op,
@@ -2695,7 +2707,32 @@ SDValue M68kTargetLowering::LowerExternalSymbol(SDValue Op,
   // In PIC mode (unless we're in PCRel PIC mode) we add an offset to the
   // global base reg.
   const Module *Mod = DAG.getMachineFunction().getFunction().getParent();
-  unsigned char OpFlag = Subtarget.classifyExternalReference(*Mod);
+
+  unsigned char OpFlag = Subtarget.classifyExternalReference(*Mod, Sym);
+
+  // If this is actually a known global variable, use the more specific lowering.
+  // This is important for TLS symbols that might be referenced as external.
+  if (OpFlag == M68kII::MO_NO_FLAG || !M68kII::isTLSGD(OpFlag)) {
+    if (const GlobalValue *GV = Mod->getNamedValue(Sym)) {
+      return LowerGlobalAddress(DAG.getGlobalAddress(GV, DL, PtrVT), DAG);
+    }
+  }
+
+  // Handle Rust internal TLS symbols by name.
+  // This is now handled by classifyExternalReference calling isTLSName.
+  if (M68kII::isTLSGD(OpFlag) || M68kII::isTLSLD(OpFlag) || 
+      M68kII::isTLSIE(OpFlag) || M68kII::isTLSLE(OpFlag)) {
+    // We manually lower it as Initial Exec TLS if caught by name.
+    SDValue GOT = DAG.getNode(M68kISD::GLOBAL_BASE_REG, DL, PtrVT);
+    SDValue Tp = getM68kReadTp(DL, DAG);
+    SDValue TGA = DAG.getTargetExternalSymbol(Sym, PtrVT, OpFlag);
+    TGA = DAG.getNode(M68kISD::Wrapper, DL, PtrVT, TGA);
+    SDValue Addr = DAG.getNode(ISD::ADD, DL, PtrVT, TGA, GOT);
+    SDValue Offset =
+        DAG.getLoad(PtrVT, DL, DAG.getEntryNode(), Addr,
+                    MachinePointerInfo::getGOT(DAG.getMachineFunction()));
+    return DAG.getNode(ISD::ADD, DL, PtrVT, Offset, Tp);
+  }
 
   unsigned WrapperKind = M68kISD::Wrapper;
   if (M68kII::isPCRelGlobalReference(OpFlag)) {

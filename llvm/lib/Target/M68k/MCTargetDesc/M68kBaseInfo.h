@@ -206,6 +206,11 @@ inline static bool isGlobalStubReference(unsigned char TargetFlag) {
   }
 }
 
+inline static bool isTLSGD(unsigned char Flag) { return Flag == M68kII::MO_TLSGD; }
+inline static bool isTLSLD(unsigned char Flag) { return Flag == M68kII::MO_TLSLD; }
+inline static bool isTLSIE(unsigned char Flag) { return Flag == M68kII::MO_TLSIE; }
+inline static bool isTLSLE(unsigned char Flag) { return Flag == M68kII::MO_TLSLE; }
+
 /// Return True if the specified GlobalValue is a direct reference for a
 /// symbol.
 inline static bool isDirectGlobalReference(unsigned char Flag) {

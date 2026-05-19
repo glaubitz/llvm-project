@@ -18,6 +18,7 @@
 
 def : Pat<(i32 (MxWrapper tconstpool    :$src)), (MOV32ri tconstpool    :$src)>;
 def : Pat<(i32 (MxWrapper tglobaladdr   :$src)), (MOV32ri tglobaladdr   :$src)>;
+def : Pat<(i32 (MxWrapper tglobaltlsaddr:$src)), (MOV32ri tglobaltlsaddr:$src)>;
 def : Pat<(i32 (MxWrapper texternalsym  :$src)), (MOV32ri texternalsym  :$src)>;
 def : Pat<(i32 (MxWrapper tjumptable    :$src)), (MOV32ri tjumptable    :$src)>;
 def : Pat<(i32 (MxWrapper tblockaddress :$src)), (MOV32ri tblockaddress :$src)>;
@@ -28,6 +29,8 @@ def : Pat<(add MxARD32:$src, (MxWrapper tjumptable:$opd)),
           (ADD32ai MxARD32:$src, tjumptable:$opd)>;
 def : Pat<(add MxARD32:$src, (MxWrapper tglobaladdr :$opd)),
           (ADD32ai MxARD32:$src, tglobaladdr:$opd)>;
+def : Pat<(add MxARD32:$src, (MxWrapper tglobaltlsaddr :$opd)),
+          (ADD32ai MxARD32:$src, tglobaltlsaddr:$opd)>;
 def : Pat<(add MxARD32:$src, (MxWrapper texternalsym:$opd)),
           (ADD32ai MxARD32:$src, texternalsym:$opd)>;
 def : Pat<(add MxARD32:$src, (MxWrapper tblockaddress:$opd)),
@@ -35,6 +38,8 @@ def : Pat<(add MxARD32:$src, (MxWrapper tblockaddress:$opd)),
 
 def : Pat<(store (i32 (MxWrapper tglobaladdr:$src)), iPTR:$dst),
           (MOV32ji MxARI32:$dst, tglobaladdr:$src)>;
+def : Pat<(store (i32 (MxWrapper tglobaltlsaddr:$src)), iPTR:$dst),
+          (MOV32ji MxARI32:$dst, tglobaltlsaddr:$src)>;
 def : Pat<(store (i32 (MxWrapper texternalsym:$src)), iPTR:$dst),
           (MOV32ji MxARI32:$dst, texternalsym:$src)>;
 def : Pat<(store (i32 (MxWrapper tblockaddress:$src)), iPTR:$dst),
@@ -42,10 +47,12 @@ def : Pat<(store (i32 (MxWrapper tblockaddress:$src)), iPTR:$dst),
 
 def : Pat<(i32 (MxWrapperPC tconstpool    :$src)), (LEA32q tconstpool    :$src)>;
 def : Pat<(i32 (MxWrapperPC tglobaladdr   :$src)), (LEA32q tglobaladdr   :$src)>;
+def : Pat<(i32 (MxWrapperPC tglobaltlsaddr:$src)), (LEA32q tglobaltlsaddr:$src)>;
 def : Pat<(i32 (MxWrapperPC texternalsym :$src)), (LEA32q texternalsym :$src)>;
 def : Pat<(i32 (MxWrapperPC tblockaddress :$src)), (LEA32q tblockaddress :$src)>;
 
 def : Pat<(i32 (MxWrapperPC32 tglobaladdr   :$src)), (LEA32q32 tglobaladdr   :$src)>;
+def : Pat<(i32 (MxWrapperPC32 tglobaltlsaddr:$src)), (LEA32q32 tglobaltlsaddr:$src)>;
 def : Pat<(i32 (MxWrapperPC32 texternalsym :$src)), (LEA32q32 texternalsym :$src)>;
 def : Pat<(i32 (MxWrapperPC32 tblockaddress :$src)), (LEA32q32 tblockaddress :$src)>;
 def : Pat<(i32 (MxWrapperPC32 tjumptable    :$src)), (LEA32q32 tjumptable    :$src)>;

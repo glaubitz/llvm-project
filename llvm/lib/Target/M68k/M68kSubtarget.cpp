@@ -189,9 +189,10 @@ unsigned char M68kSubtarget::classifyBlockAddressReference() const {
 }
 
 unsigned char
-M68kSubtarget::classifyLocalReference(const GlobalValue *GV) const {
-  if (GV && GV->isThreadLocal()) {
-    TLSModel::Model Model = TM.getTLSModel(GV);
+M68kSubtarget::classifyLocalReference(const GlobalValue *GV,
+                                       const char *Sym) const {
+  if ((GV && GV->isThreadLocal()) || isTLSName(Sym)) {
+    TLSModel::Model Model = GV ? TM.getTLSModel(GV) : TLSModel::InitialExec;
     switch (Model) {
     case TLSModel::LocalExec:
       return M68kII::MO_TLSLE;
@@ -240,9 +241,10 @@ M68kSubtarget::classifyLocalReference(const GlobalValue *GV) const {
   }
 }
 
-unsigned char M68kSubtarget::classifyExternalReference(const Module &M) const {
-  if (TM.shouldAssumeDSOLocal(nullptr))
-    return classifyLocalReference(nullptr);
+unsigned char M68kSubtarget::classifyExternalReference(const Module &M,
+                                                      const char *Sym) const {
+  if (TM.shouldAssumeDSOLocal(nullptr) || isTLSName(Sym))
+    return classifyLocalReference(nullptr, Sym);
 
   if (isPositionIndependent())
     return M68kII::MO_GOTPCREL;
@@ -256,9 +258,10 @@ M68kSubtarget::classifyGlobalReference(const GlobalValue *GV) const {
 }
 
 unsigned char M68kSubtarget::classifyGlobalReference(const GlobalValue *GV,
-                                                     const Module &M) const {
-  if (GV && GV->isThreadLocal()) {
-    TLSModel::Model Model = TM.getTLSModel(GV);
+                                                     const Module &M,
+                                                     const char *Sym) const {
+  if ((GV && GV->isThreadLocal()) || isTLSName(Sym)) {
+    TLSModel::Model Model = GV ? TM.getTLSModel(GV) : TLSModel::InitialExec;
     switch (Model) {
     case TLSModel::GeneralDynamic:
       return M68kII::MO_TLSGD;
@@ -272,7 +275,7 @@ unsigned char M68kSubtarget::classifyGlobalReference(const GlobalValue *GV,
   }
 
   if (TM.shouldAssumeDSOLocal(GV))
-    return classifyLocalReference(GV);
+    return classifyLocalReference(GV, Sym);
 
   switch (TM.getCodeModel()) {
   default:
@@ -328,9 +331,10 @@ M68kSubtarget::classifyGlobalFunctionReference(const GlobalValue *GV) const {
 
 unsigned char
 M68kSubtarget::classifyGlobalFunctionReference(const GlobalValue *GV,
-                                               const Module &M) const {
-  if (GV && GV->isThreadLocal()) {
-    TLSModel::Model Model = TM.getTLSModel(GV);
+                                               const Module &M,
+                                               const char *Sym) const {
+  if ((GV && GV->isThreadLocal()) || isTLSName(Sym)) {
+    TLSModel::Model Model = GV ? TM.getTLSModel(GV) : TLSModel::InitialExec;
     switch (Model) {
     case TLSModel::InitialExec:
       return M68kII::MO_TLSIE;
@@ -362,4 +366,11 @@ M68kSubtarget::classifyGlobalFunctionReference(const GlobalValue *GV,
 
   // Ensure that we don't emit PLT relocations when in non-pic modes.
   return isPositionIndependent() ? M68kII::MO_PLT : M68kII::MO_ABSOLUTE_ADDRESS;
+}
+
+bool M68kSubtarget::isTLSName(const char *Sym) const {
+  if (!Sym)
+    return false;
+  StringRef Name(Sym);
+  return Name.ends_with("___RUST_STD_INTERNAL_VAL");
 }
