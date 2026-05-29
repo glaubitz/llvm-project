@@ -501,6 +501,27 @@ M68kTargetLowering::LowerMemArgument(SDValue Chain, CallingConv::ID CallConv,
   }
 }
 
+static void flattenArgTypes(const DataLayout &DL, Type *Ty,
+                            SmallVectorImpl<Type *> &FlatTypes) {
+  if (auto *STy = dyn_cast<StructType>(Ty)) {
+    for (Type *ETy : STy->elements())
+      flattenArgTypes(DL, ETy, FlatTypes);
+  } else if (auto *ATy = dyn_cast<ArrayType>(Ty)) {
+    Type *ETy = ATy->getElementType();
+    for (unsigned i = 0; i < ATy->getNumElements(); ++i)
+      flattenArgTypes(DL, ETy, FlatTypes);
+  } else {
+    unsigned Slots = 1;
+    if (Ty->isIntegerTy()) {
+      Slots = (Ty->getIntegerBitWidth() + 31) / 32;
+    } else if (Ty->isDoubleTy()) {
+      Slots = 2;
+    }
+    for (unsigned i = 0; i < Slots; ++i)
+      FlatTypes.push_back(Ty);
+  }
+}
+
 SDValue M68kTargetLowering::LowerMemOpCallTo(SDValue Chain, SDValue StackPtr,
                                              SDValue Arg, const SDLoc &DL,
                                              SelectionDAG &DAG,
@@ -578,8 +599,15 @@ SDValue M68kTargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
   // Analyze operands of the call, assigning locations to each operand.
   SmallVector<CCValAssign, 16> ArgLocs;
   SmallVector<Type *, 4> ArgTypes;
-  for (const auto &Arg : CLI.getArgs())
-    ArgTypes.emplace_back(Arg.Ty);
+  if (SR != NotStructReturn) {
+    ArgTypes.push_back(PointerType::get(*DAG.getContext(), 0));
+  }
+  for (const auto &Arg : CLI.getArgs()) {
+    if (Arg.IsByVal)
+      ArgTypes.emplace_back(Arg.Ty);
+    else
+      flattenArgTypes(DAG.getDataLayout(), Arg.Ty, ArgTypes);
+  }
   M68kCCState CCInfo(ArgTypes, CallConv, IsVarArg, MF, ArgLocs,
                      *DAG.getContext());
   CCInfo.AnalyzeCallOperands(Outs, CC_M68k);
@@ -931,8 +959,12 @@ SDValue M68kTargetLowering::LowerFormalArguments(
   // Assign locations to all of the incoming arguments.
   SmallVector<CCValAssign, 16> ArgLocs;
   SmallVector<Type *, 4> ArgTypes;
-  for (const Argument &Arg : MF.getFunction().args())
-    ArgTypes.emplace_back(Arg.getType());
+  for (const Argument &Arg : MF.getFunction().args()) {
+    if (Arg.hasByValAttr())
+      ArgTypes.emplace_back(Arg.getType());
+    else
+      flattenArgTypes(DAG.getDataLayout(), Arg.getType(), ArgTypes);
+  }
   M68kCCState CCInfo(ArgTypes, CCID, IsVarArg, MF, ArgLocs, *DAG.getContext());
 
   CCInfo.AnalyzeFormalArguments(Ins, CC_M68k);

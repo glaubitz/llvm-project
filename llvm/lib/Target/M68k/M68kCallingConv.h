@@ -52,14 +52,10 @@ inline bool CC_M68k_Any_AssignToReg(unsigned &ValNo, MVT &ValVT, MVT &LocVT,
   };
 
   const auto &ArgTypes = CCInfo.ArgTypeList;
-  auto I = ArgTypes.begin(), End = ArgTypes.end();
-  int No = ValNo;
-  while (No > 0 && I != End) {
-    No -= (*I)->isIntegerTy(64) ? 2 : 1;
-    ++I;
-  }
+  if (ValNo >= ArgTypes.size())
+    return false;
 
-  bool IsPtr = I != End && (*I)->isPointerTy();
+  bool IsPtr = ArgTypes[ValNo]->isPointerTy();
 
   unsigned Reg =
       IsPtr ? State.AllocateReg(AddrRegList) : State.AllocateReg(DataRegList);
