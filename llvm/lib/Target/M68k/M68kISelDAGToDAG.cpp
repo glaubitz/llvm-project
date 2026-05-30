@@ -883,14 +883,6 @@ bool M68kDAGToDAGISel::SelectARID(SDNode *Parent, SDValue N, SDValue &Disp,
     return false;
 
   if (AM.isPCRelative()) {
-    if (Parent && (Parent->getOpcode() == ISD::STORE ||
-                   Parent->getOpcode() == ISD::ATOMIC_STORE ||
-                   Parent->getOpcode() == ISD::ATOMIC_CMP_SWAP)) {
-      LLVM_DEBUG(dbgs() << "SUCCESS: Using PC-relative as register base for store\n");
-      Disp = getI16Imm(0, SDLoc(N));
-      Base = N;
-      return true;
-    }
     LLVM_DEBUG(dbgs() << "REJECT: Cannot match PC relative address\n");
     return false;
   }
@@ -979,14 +971,6 @@ bool M68kDAGToDAGISel::SelectARID32(SDNode *Parent, SDValue N, SDValue &Disp,
     return false;
 
   if (AM.isPCRelative()) {
-    if (Parent && (Parent->getOpcode() == ISD::STORE ||
-                   Parent->getOpcode() == ISD::ATOMIC_STORE ||
-                   Parent->getOpcode() == ISD::ATOMIC_CMP_SWAP)) {
-      LLVM_DEBUG(dbgs() << "SUCCESS: Using PC-relative as register base for store\n");
-      Disp = getI32Imm(0, SDLoc(N));
-      Base = N;
-      return true;
-    }
     LLVM_DEBUG(dbgs() << "REJECT: Cannot match PC relative address\n");
     return false;
   }
@@ -1030,15 +1014,6 @@ bool M68kDAGToDAGISel::SelectARII(SDNode *Parent, SDValue N, SDValue &Disp,
     return false;
 
   if (AM.isPCRelative()) {
-    if (Parent && (Parent->getOpcode() == ISD::STORE ||
-                   Parent->getOpcode() == ISD::ATOMIC_STORE ||
-                   Parent->getOpcode() == ISD::ATOMIC_CMP_SWAP)) {
-      LLVM_DEBUG(dbgs() << "SUCCESS: Using PC-relative as register base for store\n");
-      Disp = getI8Imm(0, SDLoc(N));
-      Base = N;
-      Index = CurDAG->getRegister(0, MVT::i32);
-      return true;
-    }
     LLVM_DEBUG(dbgs() << "REJECT: PC relative\n");
     return false;
   }
