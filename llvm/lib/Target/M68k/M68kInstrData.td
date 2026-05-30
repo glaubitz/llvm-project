@@ -133,6 +133,7 @@ foreach DST_REG = ["r", "a"] in {
                   MxMoveEncoding<!cast<MxMoveSize>("MxMoveSize"#TYPE.Size),
                                  !cast<MxEncMemOp>("MxMoveDstOpEnc_"#DST_REG),
                                  !cast<MxEncMemOp>("MxMoveSrcOpEnc_"#SRC_REG)>>;
+  }
 } // foreach DST_REG
 foreach TYPE = [MxType8, MxType16, MxType32] in
 def MOV # TYPE.Size # dd # TYPE.Postfix
@@ -198,6 +199,7 @@ foreach REG = ["r", "a", "d"] in {
                   MxMoveEncoding<!cast<MxMoveSize>("MxMoveSize"#TYPE.Size),
                                  !cast<MxEncMemOp>("MxMoveDstOpEnc_"#REG),
                                  MxEncAddrMode_i<"src", TYPE.Size>>>;
+  }
 } // foreach REG
 
 // R <- M
