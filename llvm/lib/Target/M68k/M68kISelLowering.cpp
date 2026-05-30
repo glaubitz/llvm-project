@@ -159,6 +159,9 @@ M68kTargetLowering::M68kTargetLowering(const M68kTargetMachine &TM,
 
   setOperationAction(ISD::DYNAMIC_STACKALLOC, PtrVT, Custom);
 
+  if (isPositionIndependent())
+    setOperationAction(ISD::GLOBAL_OFFSET_TABLE, PtrVT, Custom);
+
   computeRegisterProperties(STI.getRegisterInfo());
 
   // We lower the `atomic-compare-and-swap` to `__sync_val_compare_and_swap`
@@ -867,6 +870,14 @@ SDValue M68kTargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
     Ops.push_back(DAG.getRegister(RegsToPass[i].first,
                                   RegsToPass[i].second.getValueType()));
 
+  if (isPositionIndependent()) {
+    Chain = DAG.getCopyToReg(Chain, DL, M68k::A5,
+                             DAG.getNode(M68kISD::GLOBAL_BASE_REG, DL, getPointerTy(DAG.getDataLayout())),
+                             InGlue);
+    InGlue = Chain.getValue(1);
+    Ops.push_back(DAG.getRegister(M68k::A5, getPointerTy(DAG.getDataLayout())));
+  }
+
   // Add a register mask operand representing the call-preserved registers.
   const uint32_t *Mask = RegInfo->getCallPreservedMask(MF, CallConv);
   assert(Mask && "Missing call preserved mask for calling convention");
@@ -1421,6 +1432,9 @@ SDValue M68kTargetLowering::LowerOperation(SDValue Op,
   switch (Op.getOpcode()) {
   default:
     llvm_unreachable("Should not custom lower this!");
+  case ISD::GLOBAL_OFFSET_TABLE:
+    return DAG.getNode(M68kISD::GLOBAL_BASE_REG, SDLoc(Op),
+                       getPointerTy(DAG.getDataLayout()));
   case ISD::SADDO:
   case ISD::UADDO:
   case ISD::SSUBO:
