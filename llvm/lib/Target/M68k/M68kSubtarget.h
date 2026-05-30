@@ -100,6 +100,8 @@ public:
 
   bool isTargetELF() const { return TargetTriple.isOSBinFormatELF(); }
 
+  bool isTargetLinux() const { return TargetTriple.isOSLinux(); }
+
   /// Return true if the subtarget allows calls to immediate address.
   bool isLegalToCallImmediateAddr() const;
 

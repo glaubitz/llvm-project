@@ -147,6 +147,10 @@ BitVector M68kRegisterInfo::getReservedRegs(const MachineFunction &MF) const {
     setBitVector(M68k::A5);
   }
 
+  if (MF.getSubtarget<M68kSubtarget>().isTargetLinux()) {
+    setBitVector(M68k::A2);
+  }
+
   if (TFI->hasFP(MF)) {
     setBitVector(FramePtr);
   }

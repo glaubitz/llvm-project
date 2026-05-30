@@ -1516,6 +1516,10 @@ SDValue M68kTargetLowering::getTLSGetAddr(GlobalAddressSDNode *GA,
 }
 
 SDValue M68kTargetLowering::getM68kReadTp(SDLoc Loc, SelectionDAG &DAG) const {
+  if (Subtarget.isTargetLinux()) {
+    return DAG.getCopyFromReg(DAG.getEntryNode(), Loc, M68k::A2,
+                              getPointerTy(DAG.getDataLayout()));
+  }
   return LowerExternalSymbolCall(DAG, Loc, "__m68k_read_tp", ArgListTy());
 }
 
