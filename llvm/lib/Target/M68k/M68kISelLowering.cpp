@@ -3474,8 +3474,9 @@ SDValue M68kTargetLowering::LowerVASTART(SDValue Op, SelectionDAG &DAG) const {
                       MachinePointerInfo(SV));
 }
 
-SDValue M68kTargetLowering::LowerATOMIC_CMP_SWAP(SDValue Op,
-                                                SelectionDAG &DAG) const {
+llvm::SDValue
+M68kTargetLowering::LowerATOMIC_CMP_SWAP(llvm::SDValue Op,
+                                         llvm::SelectionDAG &DAG) const {
   auto *Node = cast<AtomicSDNode>(Op);
   SDLoc DL(Op);
   SDVTList VTs = DAG.getVTList(Op.getSimpleValueType(0), MVT::i8, MVT::Other);
