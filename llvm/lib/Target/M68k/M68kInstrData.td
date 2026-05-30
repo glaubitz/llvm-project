@@ -107,10 +107,12 @@ defm Dst : MxMoveOperandEncodings<"dst">;
 defvar MxMoveSrcAMs = ["o", "e", "k", "q", "f", "p", "b", "j"];
 defvar MxMoveDstAMs = ["o", "e", "f", "p", "b", "j"];
 
-let Defs = [CCR] in
 class MxMove<string size, dag outs, dag ins, list<dag> pattern, MxMoveEncoding enc>
     : MxInst<outs, ins, "move."#size#"\t$src, $dst", pattern> {
   let Inst = enc.Value;
+  // Almost all MOVE instructions clobber flags on M68k.
+  // The only exception is MOVEA (Move to Address Register).
+  let Defs = [CCR];
 }
 
 // R <- R
@@ -123,6 +125,7 @@ class MxMove_RR<MxType TYPE, string DST_REG, string SRC_REG,
              [(null_frag)], ENC>;
 
 foreach DST_REG = ["r", "a"] in {
+  let Defs = !if(!eq(DST_REG, "a"), []<Register>, [CCR]) in {
   foreach SRC_REG = ["r", "a"] in
   foreach TYPE = [MxType16, MxType32] in
   def MOV # TYPE.Size # DST_REG # SRC_REG # TYPE.Postfix
@@ -188,6 +191,7 @@ class MxMove_RI<MxType TYPE, string DST_REG, MxMoveEncoding ENC,
               [(null_frag)], ENC>;
 
 foreach REG = ["r", "a", "d"] in {
+  let Defs = !if(!eq(REG, "a"), []<Register>, [CCR]) in {
   foreach TYPE = !if(!eq(REG, "d"), [MxType8, MxType16, MxType32], [MxType16, MxType32]) in
   def MOV # TYPE.Size # REG # i # TYPE.Postfix
       : MxMove_RI<TYPE, REG,
@@ -209,10 +213,12 @@ class MxMove_RM<MxType TYPE, string DST_REG, MxOpBundle SRC, MxEncMemOp SRC_ENC,
 foreach REG = ["r", "a", "d"] in {
   foreach TYPE = !if(!eq(REG, "d"), [MxType8, MxType16, MxType32], [MxType16, MxType32]) in {
     let Predicates = [AtLeastM68020] in {
+    let Defs = !if(!eq(REG, "a"), []<Register>, [CCR]) in {
     def MOV # TYPE.Size # REG # q32 : MxMove_RM<TYPE, REG, MxOp32AddrMode_q32,
                                                 MxEncAddrMode_q32<"src">>;
     def MOV # TYPE.Size # REG # p32 : MxMove_RM<TYPE, REG, MxOp32AddrMode_p32,
                                                 MxEncAddrMode_p32<"src">>;
+    }
 
     def MOV # TYPE.Size # p32 # REG : MxMove_MR<TYPE, MxOp32AddrMode_p32, REG,
                                                 MxMoveEncoding<!cast<MxMoveSize>("MxMoveSize"#TYPE.Size),
@@ -224,6 +230,7 @@ foreach REG = ["r", "a", "d"] in {
 
 foreach REG = ["r", "a", "d"] in
 foreach AM = MxMoveSrcAMs in {
+  let Defs = !if(!eq(REG, "a"), []<Register>, [CCR]) in
   foreach TYPE = !if(!eq(REG, "d"), [MxType8, MxType16, MxType32], [MxType16, MxType32]) in
   def MOV # TYPE.Size # REG # AM # TYPE.Postfix
       : MxMove_RM<TYPE, REG, !cast<MxOpBundle>("MxOp"#TYPE.Size#"AddrMode_"#AM),
@@ -233,7 +240,8 @@ foreach AM = MxMoveSrcAMs in {
 // Tail call version
 let Pattern = [(null_frag)] in {
   foreach REG = ["r", "a"] in {
-    let Predicates = [AtLeastM68020] in
+    let Defs = !if(!eq(REG, "a"), []<Register>, [CCR]),
+        Predicates = [AtLeastM68020] in
     def MOV32 # REG # q32_TC : MxMove_RM<MxType32, REG, MxOp32AddrMode_q32,
                                          MxEncAddrMode_q32<"src">> {
       let isCodeGenOnly = true;
@@ -242,6 +250,7 @@ let Pattern = [(null_frag)] in {
 
   foreach REG = ["r", "a"] in
   foreach AM = MxMoveSrcAMs in {
+    let Defs = !if(!eq(REG, "a"), []<Register>, [CCR]) in
     foreach TYPE = [MxType16, MxType32] in
     def MOV # TYPE.Size # REG # AM # _TC
         : MxMove_RM<TYPE, REG, !cast<MxOpBundle>("MxOp"#TYPE.Size#"AddrMode_"#AM),
