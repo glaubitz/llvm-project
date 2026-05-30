@@ -81,13 +81,13 @@ multiclass MxMoveOperandEncodings<string opnd_name> {
   // (i,PC)
   def MxMove#NAME#OpEnc_q : MxEncAddrMode_q<opnd_name>;
   // (i32,PC)
-  def MxMove#NAME#OpEnc_q32 : MxMove#NAME#OpEnc_q;
+  def MxMove#NAME#OpEnc_q32 : MxEncAddrMode_q32<opnd_name>;
   // (i,An,Xn)
   def MxMove#NAME#OpEnc_f : MxEncAddrMode_f<opnd_name>;
   // (i,An)
   def MxMove#NAME#OpEnc_p : MxEncAddrMode_p<opnd_name>;
   // (i32,An)
-  def MxMove#NAME#OpEnc_p32 : MxMove#NAME#OpEnc_p;
+  def MxMove#NAME#OpEnc_p32 : MxEncAddrMode_p32<opnd_name>;
   // (abs).W/L
   def MxMove#NAME#OpEnc_b : MxEncAddrMode_abs<opnd_name, /*W/L=*/true>;
   // (An)
@@ -115,7 +115,7 @@ class MxMove_RR<MxType TYPE, string DST_REG, string SRC_REG,
              [(null_frag)], ENC>;
 
 foreach DST_REG = ["r", "a"] in {
-  let Defs = !if(!eq(DST_REG, "a"), [], [CCR]) in {
+  let Defs = !if(!eq(DST_REG, "a"), []<Register>, [CCR]) in {
   foreach SRC_REG = ["r", "a"] in
   foreach TYPE = [MxType16, MxType32] in
   def MOV # TYPE.Size # DST_REG # SRC_REG # TYPE.Postfix
@@ -151,7 +151,7 @@ defvar MxMoveSrcAMs = ["o", "e", "f", "p", "b", "j", "q", "k"];
 
 foreach REG = ["r", "a", "d"] in
 foreach AM = MxMoveDstAMs in {
-  let Defs = !if(!eq(REG, "a"), [], [CCR]) in
+  let Defs = !if(!eq(REG, "a"), []<Register>, [CCR]) in
   foreach TYPE = !if(!eq(REG, "d"), [MxType8, MxType16, MxType32], [MxType16, MxType32]) in
   def MOV # TYPE.Size # AM # REG # TYPE.Postfix
       : MxMove_MR<TYPE, !cast<MxOpBundle>("MxOp"#TYPE.Size#"AddrMode_"#AM), REG,
@@ -183,7 +183,7 @@ class MxMove_RI<MxType TYPE, string DST_REG, MxMoveEncoding ENC,
               [(null_frag)], ENC>;
 
 foreach REG = ["r", "a", "d"] in {
-  let Defs = !if(!eq(REG, "a"), [], [CCR]) in {
+  let Defs = !if(!eq(REG, "a"), []<Register>, [CCR]) in {
   foreach TYPE = !if(!eq(REG, "d"), [MxType8, MxType16, MxType32], [MxType16, MxType32]) in
   def MOV # TYPE.Size # REG # i # TYPE.Postfix
       : MxMove_RI<TYPE, REG,
@@ -204,7 +204,7 @@ class MxMove_RM<MxType TYPE, string DST_REG, MxOpBundle SRC, MxEncMemOp SRC_ENC,
              MxMoveEncoding<SIZE_ENC, DST_ENC, SRC_ENC>>;
 
 foreach REG = ["r", "a", "d"] in {
-  let Defs = !if(!eq(REG, "a"), [], [CCR]) in {
+  let Defs = !if(!eq(REG, "a"), []<Register>, [CCR]) in {
   foreach TYPE = !if(!eq(REG, "d"), [MxType8, MxType16, MxType32], [MxType16, MxType32]) in {
     let Predicates = [AtLeastM68020] in {
     def MOV # TYPE.Size # REG # q32 : MxMove_RM<TYPE, REG, MxOp32AddrMode_q32,
@@ -223,7 +223,7 @@ foreach REG = ["r", "a", "d"] in {
 
 foreach REG = ["r", "a", "d"] in
 foreach AM = MxMoveSrcAMs in {
-  let Defs = !if(!eq(REG, "a"), [], [CCR]) in
+  let Defs = !if(!eq(REG, "a"), []<Register>, [CCR]) in
   foreach TYPE = !if(!eq(REG, "d"), [MxType8, MxType16, MxType32], [MxType16, MxType32]) in
   def MOV # TYPE.Size # REG # AM # TYPE.Postfix
       : MxMove_RM<TYPE, REG, !cast<MxOpBundle>("MxOp"#TYPE.Size#"AddrMode_"#AM),
@@ -238,7 +238,7 @@ def MOV32aq32_TC : MxMove_RM<MxType32, "a", MxOp32AddrMode_q32,
 foreach AM = MxMoveSrcAMs in {
   foreach TYPE = [MxType8, MxType16, MxType32] in
   foreach REG = ["d", "a"] in
-  let Defs = !if(!eq(REG, "a"), [], [CCR]) in
+  let Defs = !if(!eq(REG, "a"), []<Register>, [CCR]) in
   def MOV # TYPE.Size # REG # AM # _TC
       : MxMove_RM<TYPE, REG, !cast<MxOpBundle>("MxOp"#TYPE.Size#"AddrMode_"#AM),
                   !cast<MxEncMemOp>("MxMoveSrcOpEnc_"#AM)>;
