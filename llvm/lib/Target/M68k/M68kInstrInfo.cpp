@@ -874,7 +874,7 @@ unsigned M68kInstrInfo::getGlobalBaseReg(MachineFunction *MF) const {
   // lucky get one, otherwise it does not really matter which callee-save to
   // use.
   MachineRegisterInfo &RegInfo = MF->getRegInfo();
-  GlobalBaseReg = RegInfo.createVirtualRegister(&M68k::AR32_NOSPRegClass);
+  GlobalBaseReg = M68k::A5;
   MxFI->setGlobalBaseReg(GlobalBaseReg);
   return GlobalBaseReg;
 }
