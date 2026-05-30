@@ -1209,39 +1209,32 @@ bool M68kDAGToDAGISel::SelectARI(SDNode *Parent, SDValue N, SDValue &Base) {
                          getTargetMachine().getCodeModel(),
                          Subtarget->atLeastM68020());
 
-  if (!matchAddress(N, AM)) {
-    LLVM_DEBUG(dbgs() << "REJECT: Match failed\n");
-    return false;
+  if (matchAddress(N, AM)) {
+    if (AM.isPCRelative()) {
+      LLVM_DEBUG(dbgs() << "REJECT: PC relative address matched ARI\n");
+    } else if (AM.hasIndexReg() || AM.Disp != 0 || AM.hasSymbolicDisplacement()) {
+      LLVM_DEBUG(dbgs() << "REJECT: Cannot match Index, Disp or Symbol\n");
+    } else if (AM.hasBaseReg()) {
+      Base = AM.BaseReg;
+      LLVM_DEBUG(dbgs() << "SUCCESS\n");
+      return true;
+    }
   }
 
-  if (AM.isPCRelative()) {
-    if (Parent && (Parent->getOpcode() == ISD::STORE ||
-                   Parent->getOpcode() == ISD::ATOMIC_STORE ||
-                   Parent->getOpcode() == ISD::ATOMIC_CMP_SWAP)) {
+  // Fallback for PC-relative addresses in store-like contexts.
+  // Since M68k does not support PC-relative destinations for data-altering
+  // instructions, we must force them to be loaded into a register first.
+  if (Parent && (Parent->getOpcode() == ISD::STORE ||
+                 Parent->getOpcode() == ISD::ATOMIC_STORE ||
+                 Parent->getOpcode() == ISD::ATOMIC_CMP_SWAP)) {
+    M68kISelAddressMode PCAM(M68kISelAddressMode::AddrType::PCD,
+                             getTargetMachine().getCodeModel(),
+                             Subtarget->atLeastM68020());
+    if (matchAddress(N, PCAM) && PCAM.isPCRelative()) {
       LLVM_DEBUG(dbgs() << "SUCCESS: Using PC-relative as register base for store\n");
       Base = N;
       return true;
     }
-    LLVM_DEBUG(dbgs() << "REJECT: Cannot match PC relative address\n");
-    return false;
-  }
-
-  // AddrType::ARI does not use these
-  if (AM.hasIndexReg() || AM.Disp != 0) {
-    LLVM_DEBUG(dbgs() << "REJECT: Cannot match Index or Disp\n");
-    return false;
-  }
-
-  // Must be matched by AddrType::AL
-  if (AM.hasSymbolicDisplacement()) {
-    LLVM_DEBUG(dbgs() << "REJECT: Cannot match Symbolic Disp\n");
-    return false;
-  }
-
-  if (AM.hasBaseReg()) {
-    Base = AM.BaseReg;
-    LLVM_DEBUG(dbgs() << "SUCCESS\n");
-    return true;
   }
 
   return false;
