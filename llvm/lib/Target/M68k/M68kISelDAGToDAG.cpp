@@ -582,6 +582,8 @@ bool M68kDAGToDAGISel::matchAddressRecursively(SDValue N,
       return false;
     AM.GV = GA->getGlobal();
     AM.SymbolFlags = GA->getTargetFlags();
+    if (!foldOffsetIntoAddress(GA->getOffset(), AM))
+      return false;
     return true;
   }
 
@@ -1098,10 +1100,6 @@ bool M68kDAGToDAGISel::SelectAL(SDNode *Parent, SDValue N, SDValue &Sym) {
 }
 
 bool M68kDAGToDAGISel::SelectPCD(SDNode *Parent, SDValue N, SDValue &Disp) {
-  if (Parent && (Parent->getOpcode() == ISD::STORE ||
-                 Parent->getOpcode() == ISD::ATOMIC_STORE ||
-                 Parent->getOpcode() == ISD::ATOMIC_CMP_SWAP))
-    return false;
   LLVM_DEBUG(dbgs() << "Selecting AddrType::PCD: ");
   M68kISelAddressMode AM(M68kISelAddressMode::AddrType::PCD,
                          getTargetMachine().getCodeModel(),
@@ -1137,10 +1135,6 @@ bool M68kDAGToDAGISel::SelectPCD(SDNode *Parent, SDValue N, SDValue &Disp) {
 }
 
 bool M68kDAGToDAGISel::SelectPCD32(SDNode *Parent, SDValue N, SDValue &Disp) {
-  if (Parent && (Parent->getOpcode() == ISD::STORE ||
-                 Parent->getOpcode() == ISD::ATOMIC_STORE ||
-                 Parent->getOpcode() == ISD::ATOMIC_CMP_SWAP))
-    return false;
   LLVM_DEBUG(dbgs() << "Selecting AddrType::PCD32: ");
   M68kISelAddressMode AM(M68kISelAddressMode::AddrType::PCD,
                          getTargetMachine().getCodeModel(),
@@ -1177,10 +1171,6 @@ bool M68kDAGToDAGISel::SelectPCD32(SDNode *Parent, SDValue N, SDValue &Disp) {
 
 bool M68kDAGToDAGISel::SelectPCI(SDNode *Parent, SDValue N, SDValue &Disp,
                                  SDValue &Index) {
-  if (Parent && (Parent->getOpcode() == ISD::STORE ||
-                 Parent->getOpcode() == ISD::ATOMIC_STORE ||
-                 Parent->getOpcode() == ISD::ATOMIC_CMP_SWAP))
-    return false;
   LLVM_DEBUG(dbgs() << "Selecting AddrType::PCI: ");
   M68kISelAddressMode AM(M68kISelAddressMode::AddrType::PCI,
                          getTargetMachine().getCodeModel(),
