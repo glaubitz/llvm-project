@@ -688,9 +688,9 @@ class MxPseudoMove_DI<MxType TYPE>
 
 // i8 imm -> reg can always be converted to moveq,
 // but we still emit a pseudo for consistency.
-def MOV8di   : MxPseudoMove_DI<MxType8d>;
-def MOV16ri  : MxPseudoMove_DI<MxType16r>;
-def MOV32ri  : MxPseudoMove_DI<MxType32r>;
+def MOVI8di  : MxPseudoMove_DI<MxType8d>;
+def MOVI16ri : MxPseudoMove_DI<MxType16r>;
+def MOVI32ri : MxPseudoMove_DI<MxType32r>;
 } // let Defs = [CCR]
 
 /// This group of Pseudos is analogues to the real x86 extending moves, but
