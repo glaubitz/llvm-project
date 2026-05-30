@@ -234,6 +234,9 @@ inline static bool isGlobalRelativeToPICBase(unsigned char TargetFlag) {
     return false;
   case M68kII::MO_GOTOFF: // isPICStyleGOT: local global.
   case M68kII::MO_GOT:    // isPICStyleGOT: other global.
+  case M68kII::MO_TLSGD:
+  case M68kII::MO_TLSLD:
+  case M68kII::MO_TLSIE:
     return true;
   }
 }

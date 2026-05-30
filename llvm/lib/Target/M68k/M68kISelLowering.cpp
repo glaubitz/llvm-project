@@ -186,7 +186,8 @@ M68kTargetLowering::M68kTargetLowering(const M68kTargetMachine &TM,
           ISD::ATOMIC_LOAD_UMAX,
           ISD::ATOMIC_SWAP,
       },
-      {MVT::i8, MVT::i16, MVT::i32}, LibCall);
+      {MVT::i8, MVT::i16, MVT::i32},
+      Subtarget.atLeastM68020() ? Expand : LibCall);
 
   setMinFunctionAlignment(Align(2));
 }
@@ -599,15 +600,20 @@ SDValue M68kTargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
   // Analyze operands of the call, assigning locations to each operand.
   SmallVector<CCValAssign, 16> ArgLocs;
   SmallVector<Type *, 4> ArgTypes;
-  if (SR != NotStructReturn) {
-    ArgTypes.push_back(PointerType::get(*DAG.getContext(), 0));
-  }
   for (const auto &Arg : CLI.getArgs()) {
     if (Arg.IsByVal)
       ArgTypes.emplace_back(Arg.Ty);
     else
       flattenArgTypes(DAG.getDataLayout(), Arg.Ty, ArgTypes);
   }
+
+  // SelectionDAG's Outs vector might have more values than CLI.getArgs() due to
+  // implicit arguments like sret or other ABI-specific additions. Ensure
+  // synchronization by prepending anonymous pointer types for any missing slots.
+  while (ArgTypes.size() < Outs.size()) {
+    ArgTypes.insert(ArgTypes.begin(), PointerType::get(*DAG.getContext(), 0));
+  }
+
   M68kCCState CCInfo(ArgTypes, CallConv, IsVarArg, MF, ArgLocs,
                      *DAG.getContext());
   CCInfo.AnalyzeCallOperands(Outs, CC_M68k);
