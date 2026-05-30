@@ -96,6 +96,13 @@ def MxSDT_SEG_ALLOCA : SDTypeProfile<1, 1,[
 // Nodes
 //===----------------------------------------------------------------------===//
 
+def MxSDT_Cas : SDTypeProfile<2, 3, [
+  SDTCisVT<1, i8>, SDTCisPtrTy<2>, SDTCisSameAs<0, 3>, SDTCisSameAs<0, 4>
+]>;
+
+def MxCas : SDNode<"M68kISD::CAS", MxSDT_Cas,
+                   [SDNPHasChain, SDNPMayLoad, SDNPMayStore]>;
+
 def MxCallSeqStart : SDNode<"ISD::CALLSEQ_START", MxSDT_CallSeqStart,
                             [SDNPHasChain, SDNPOutGlue]>;
 

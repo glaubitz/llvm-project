@@ -43,7 +43,8 @@ let Defs = [CCR], mayLoad = 1, mayStore = 1 in {
 class MxCASARIOp<bits<2> size_encoding, MxType type>
     : MxInst<(outs type.ROp:$out),
              (ins type.ROp:$dc, type.ROp:$du, !cast<MxMemOp>("MxARI"#type.Size):$mem),
-             "cas."#type.Prefix#" $dc, $du, $mem"> {
+             "cas."#type.Prefix#" $dc, $du, $mem",
+             [(set type.VT:$out, CCR, (MxCas MxCP_ARI:$mem, type.VT:$dc, type.VT:$du))]> {
   let Inst = (ascend
                 (descend 0b00001, size_encoding, 0b011, MxEncAddrMode_j<"mem">.EA),
                 (descend 0b0000000, (operand "$du", 3), 0b000, (operand "$dc", 3))
@@ -58,7 +59,8 @@ def CASARI32 : MxCASARIOp<0x3, MxType32d>;
 class MxCASARIDOp<bits<2> size_encoding, MxType type>
     : MxInst<(outs type.ROp:$out),
              (ins type.ROp:$dc, type.ROp:$du, !cast<MxMemOp>("MxARID"#type.Size):$mem),
-             "cas."#type.Prefix#" $dc, $du, $mem"> {
+             "cas."#type.Prefix#" $dc, $du, $mem",
+             [(set type.VT:$out, CCR, (MxCas MxCP_ARID:$mem, type.VT:$dc, type.VT:$du))]> {
   let Inst = (ascend
                 (descend 0b00001, size_encoding, 0b011, MxEncAddrMode_p<"mem">.EA),
                 (descend 0b0000000, (operand "$du", 3), 0b000, (operand "$dc", 3)),
@@ -74,7 +76,8 @@ def CASARID32 : MxCASARIDOp<0x3, MxType32d>;
 class MxCASARIIOp<bits<2> size_encoding, MxType type>
     : MxInst<(outs type.ROp:$out),
              (ins type.ROp:$dc, type.ROp:$du, !cast<MxMemOp>("MxARII"#type.Size):$mem),
-             "cas."#type.Prefix#" $dc, $du, $mem"> {
+             "cas."#type.Prefix#" $dc, $du, $mem",
+             [(set type.VT:$out, CCR, (MxCas MxCP_ARII:$mem, type.VT:$dc, type.VT:$du))]> {
   let Inst = (ascend
                 (descend 0b00001, size_encoding, 0b011, MxEncAddrMode_f<"mem">.EA),
                 (descend 0b0000000, (operand "$du", 3), 0b000, (operand "$dc", 3)),
@@ -90,7 +93,8 @@ def CASARII32 : MxCASARIIOp<0x3, MxType32d>;
 class MxCASALOp<bits<2> size_encoding, MxType type>
     : MxInst<(outs type.ROp:$out),
              (ins type.ROp:$dc, type.ROp:$du, !cast<MxMemOp>("MxAL"#type.Size):$mem),
-             "cas."#type.Prefix#" $dc, $du, $mem"> {
+             "cas."#type.Prefix#" $dc, $du, $mem",
+             [(set type.VT:$out, CCR, (MxCas MxCP_AL:$mem, type.VT:$dc, type.VT:$du))]> {
   let Inst = (ascend
                 (descend 0b00001, size_encoding, 0b011, MxEncAddrMode_abs<"mem", true>.EA),
                 (descend 0b0000000, (operand "$du", 3), 0b000, (operand "$dc", 3)),
@@ -104,23 +108,15 @@ def CASAL16 : MxCASALOp<0x2, MxType16d>;
 def CASAL32 : MxCASALOp<0x3, MxType32d>;
 } // let Defs = [CCR], mayLoad = 1, mayStore = 1
 
-foreach mode = ["ARI", "ARII", "ARID", "AL"] in {
+// Fallback for raw pointers in registers
 foreach size = [8, 16, 32] in {
-  def : Pat<(!cast<SDPatternOperator>("atomic_cmp_swap_i"#size) !cast<ComplexPattern>("MxCP_"#mode):$ptr,
-                                                                !cast<MxRegOp>("MxDRD"#size):$cmp,
-                                                                !cast<MxRegOp>("MxDRD"#size):$new),
-            (!cast<MxInst>("CAS"#mode#size) !cast<MxRegOp>("MxDRD"#size):$cmp,
-                                       !cast<MxRegOp>("MxDRD"#size):$new,
-                                       !cast<MxMemOp>("Mx"#mode#size):$ptr)>;
-} // size
-} // addr mode
-
-foreach size = [8, 16, 32] in {
-  def : Pat<(!cast<SDPatternOperator>("atomic_cmp_swap_i"#size) iPTR:$ptr,
-                                                                !cast<MxRegOp>("MxDRD"#size):$cmp,
-                                                                !cast<MxRegOp>("MxDRD"#size):$new),
-            (!cast<MxInst>("CASARI"#size) !cast<MxRegOp>("MxDRD"#size):$cmp,
-                                          !cast<MxRegOp>("MxDRD"#size):$new,
+  def : Pat<(set !cast<MxRegOp>("MxDRD"#size):$dc, CCR,
+                 (MxCas iPTR:$ptr,
+                        !cast<MxRegOp>("MxDRD"#size):$dc,
+                        !cast<MxRegOp>("MxDRD"#size):$du)),
+            (!cast<MxInst>("CASARI"#size) !cast<MxRegOp>("MxDRD"#size):$dc,
+                                          !cast<MxRegOp>("MxDRD"#size):$du,
                                           !cast<MxMemOp>("MxARI"#size):$ptr)>;
 }
 } // let Predicates = [AtLeastM68020]
+

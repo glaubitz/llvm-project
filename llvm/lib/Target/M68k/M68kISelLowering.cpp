@@ -168,7 +168,7 @@ M68kTargetLowering::M68kTargetLowering(const M68kTargetMachine &TM,
   // for subtarget < M68020
   setMaxAtomicSizeInBitsSupported(32);
   setOperationAction(ISD::ATOMIC_CMP_SWAP, {MVT::i8, MVT::i16, MVT::i32},
-                     Subtarget.atLeastM68020() ? Legal : LibCall);
+                     Subtarget.atLeastM68020() ? Custom : LibCall);
 
   setOperationAction(ISD::ATOMIC_FENCE, MVT::Other, Custom);
 
@@ -1435,6 +1435,8 @@ SDValue M68kTargetLowering::LowerOperation(SDValue Op,
   case ISD::GLOBAL_OFFSET_TABLE:
     return DAG.getNode(M68kISD::GLOBAL_BASE_REG, SDLoc(Op),
                        getPointerTy(DAG.getDataLayout()));
+  case ISD::ATOMIC_CMP_SWAP:
+    return LowerATOMIC_CMP_SWAP(Op, DAG);
   case ISD::SADDO:
   case ISD::UADDO:
   case ISD::SSUBO:
@@ -2305,7 +2307,8 @@ static bool isM68kLogicalCmp(SDValue Op) {
   if (Op.getResNo() == 1 &&
       (Opc == M68kISD::ADD || Opc == M68kISD::SUB || Opc == M68kISD::ADDX ||
        Opc == M68kISD::SUBX || Opc == M68kISD::SMUL || Opc == M68kISD::UMUL ||
-       Opc == M68kISD::OR || Opc == M68kISD::XOR || Opc == M68kISD::AND))
+       Opc == M68kISD::OR || Opc == M68kISD::XOR || Opc == M68kISD::AND ||
+       Opc == M68kISD::CAS))
     return true;
 
   if (Op.getResNo() == 2 && Opc == M68kISD::UMUL)
@@ -3485,6 +3488,27 @@ SDValue M68kTargetLowering::LowerVASTART(SDValue Op, SelectionDAG &DAG) const {
   SDValue FR = DAG.getFrameIndex(FuncInfo->getVarArgsFrameIndex(), PtrVT);
   return DAG.getStore(Op.getOperand(0), DL, FR, Op.getOperand(1),
                       MachinePointerInfo(SV));
+}
+
+SDValue M68kTargetLowering::LowerATOMIC_CMP_SWAP(SDValue Op,
+                                                SelectionDAG &DAG) const {
+  auto *Node = cast<AtomicSDNode>(Op);
+  SDLoc DL(Op);
+  SDVTList VTs = DAG.getVTList(Op.getValueType(), MVT::i8, MVT::Other);
+  SDValue Ops[] = {Node->getChain(), Node->getBasePtr(), Node->getCompareVal(),
+                   Node->getAmount()};
+  SDValue Cas = DAG.getMemIntrinsicNode(M68kISD::CAS, DL, VTs, Ops,
+                                        Node->getMemoryVT(),
+                                        Node->getMemOperand());
+
+  SDValue Value = Cas.getValue(0);
+  SDValue CCR = Cas.getValue(1);
+  SDValue Chain = Cas.getValue(2);
+
+  SDValue Success = DAG.getNode(M68kISD::SETCC, DL, MVT::i8,
+                                DAG.getConstant(M68k::COND_EQ, DL, MVT::i8),
+                                CCR);
+  return DAG.getMergeValues({Value, Success, Chain}, DL);
 }
 
 SDValue M68kTargetLowering::LowerATOMICFENCE(SDValue Op,
