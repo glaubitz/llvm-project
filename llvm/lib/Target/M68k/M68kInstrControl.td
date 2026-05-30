@@ -295,6 +295,7 @@ class MxCall<MxOperand LOCOp, MxEncMemOp DST_ENC>
     );
 }
 
+let Uses = [A5] in {
 def CALLk : MxCall<MxPCI32, MxEncAddrMode_k<"dst">>;
 def CALLq : MxCall<MxPCD32, MxEncAddrMode_q<"dst">>;
 
@@ -304,6 +305,7 @@ def CALLf : MxCall<MxARII32, MxEncAddrMode_f<"dst">>;
 def CALLp : MxCall<MxARID32, MxEncAddrMode_p<"dst">>;
 def CALLb : MxCall<MxAL32,  MxEncAddrMode_abs<"dst", true>>;
 def CALLj : MxCall<MxARI32, MxEncAddrMode_j<"dst">>;
+} // let Uses = [A5]
 
 multiclass CallPat<MxCall callOp, list<Predicate> preds> {
   let Predicates = preds in {

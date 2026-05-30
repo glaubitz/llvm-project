@@ -807,39 +807,6 @@ void M68kDAGToDAGISel::Select(SDNode *Node) {
   default:
     break;
 
-  case ISD::GLOBAL_OFFSET_TABLE: {
-    unsigned Opc = M68k::LEA32q;
-    unsigned WrapperKind = M68kISD::WrapperPC;
-    if (Subtarget->atLeastM68020() &&
-        Subtarget->isPositionIndependent() &&
-        getTargetMachine().getCodeModel() != CodeModel::Small &&
-        getTargetMachine().getCodeModel() != CodeModel::Kernel) {
-      Opc = M68k::LEA32q32;
-      WrapperKind = M68kISD::WrapperPC32;
-    }
-
-    SDValue GOT = CurDAG->getTargetExternalSymbol(
-        "_GLOBAL_OFFSET_TABLE_", MVT::i32, M68kII::MO_GOTPCREL);
-    GOT = CurDAG->getNode(WrapperKind, DL, MVT::i32, GOT);
-    SDValue Disp;
-    if (Opc == M68k::LEA32q32) {
-      if (SelectPCD32(nullptr, GOT, Disp)) {
-        MachineSDNode *Res =
-            CurDAG->getMachineNode(M68k::LEA32q32, DL, MVT::i32, Disp);
-        ReplaceNode(Node, Res);
-        return;
-      }
-    } else {
-      if (SelectPCD(nullptr, GOT, Disp)) {
-        MachineSDNode *Res =
-            CurDAG->getMachineNode(M68k::LEA32q, DL, MVT::i32, Disp);
-        ReplaceNode(Node, Res);
-        return;
-      }
-    }
-    break;
-  }
-
   case M68kISD::GLOBAL_BASE_REG:
     ReplaceNode(Node, getGlobalBaseReg());
     return;
