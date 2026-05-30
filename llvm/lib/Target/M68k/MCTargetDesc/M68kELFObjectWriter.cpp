@@ -144,11 +144,11 @@ unsigned M68kELFObjectWriter::getRelocType(const MCFixup &Fixup,
   case M68k::S_GOT:
     switch (Type) {
     case RT_32:
-      return ELF::R_68K_GOT32O;
+      return ELF::R_68K_GOT32;
     case RT_16:
-      return ELF::R_68K_GOT16O;
+      return ELF::R_68K_GOT16;
     case RT_8:
-      return ELF::R_68K_GOT8O;
+      return ELF::R_68K_GOT8;
     }
     llvm_unreachable("Unrecognized size");
   case M68k::S_GOTPCREL:

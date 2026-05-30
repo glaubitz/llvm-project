@@ -39,6 +39,7 @@ foreach size = [8, 16, 32] in {
 }
 
 let Predicates = [AtLeastM68020] in {
+let Defs = [CCR], mayLoad = 1, mayStore = 1 in {
 class MxCASARIOp<bits<2> size_encoding, MxType type>
     : MxInst<(outs type.ROp:$out),
              (ins type.ROp:$dc, type.ROp:$du, !cast<MxMemOp>("MxARI"#type.Size):$mem),
@@ -48,8 +49,6 @@ class MxCASARIOp<bits<2> size_encoding, MxType type>
                 (descend 0b0000000, (operand "$du", 3), 0b000, (operand "$dc", 3))
               );
   let Constraints = "$out = $dc";
-  let mayLoad = 1;
-  let mayStore = 1;
 }
 
 def CASARI8  : MxCASARIOp<0x1, MxType8d>;
@@ -66,8 +65,6 @@ class MxCASARIDOp<bits<2> size_encoding, MxType type>
                 MxEncAddrMode_p<"mem">.Supplement
               );
   let Constraints = "$out = $dc";
-  let mayLoad = 1;
-  let mayStore = 1;
 }
 
 def CASARID8  : MxCASARIDOp<0x1, MxType8d>;
@@ -84,8 +81,6 @@ class MxCASARIIOp<bits<2> size_encoding, MxType type>
                 MxEncAddrMode_f<"mem">.Supplement
               );
   let Constraints = "$out = $dc";
-  let mayLoad = 1;
-  let mayStore = 1;
 }
 
 def CASARII8  : MxCASARIIOp<0x1, MxType8d>;
@@ -102,13 +97,12 @@ class MxCASALOp<bits<2> size_encoding, MxType type>
                 MxEncAddrMode_abs<"mem", true>.Supplement
               );
   let Constraints = "$out = $dc";
-  let mayLoad = 1;
-  let mayStore = 1;
 }
 
 def CASAL8  : MxCASALOp<0x1, MxType8d>;
 def CASAL16 : MxCASALOp<0x2, MxType16d>;
 def CASAL32 : MxCASALOp<0x3, MxType32d>;
+} // let Defs = [CCR], mayLoad = 1, mayStore = 1
 
 foreach mode = ["ARI", "ARII", "ARID", "AL"] in {
 foreach size = [8, 16, 32] in {
