@@ -135,6 +135,7 @@ foreach DST_REG = ["r", "a"] in {
                                    !cast<MxEncMemOp>("MxMoveSrcOpEnc_"#SRC_REG)>>;
   }
 } // foreach DST_REG
+let Defs = [CCR] in
 foreach TYPE = [MxType8, MxType16, MxType32] in
 def MOV # TYPE.Size # dd # TYPE.Postfix
     : MxMove_RR<TYPE, "d", "d",

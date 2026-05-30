@@ -31,4 +31,8 @@ void M68kSelectionDAGInfo::verifyTargetNode(const SelectionDAG &DAG,
   SelectionDAGGenTargetInfo::verifyTargetNode(DAG, N);
 }
 
+bool M68kSelectionDAGInfo::isTargetMemoryOpcode(unsigned Opcode) const {
+  return Opcode == M68kISD::CAS;
+}
+
 M68kSelectionDAGInfo::~M68kSelectionDAGInfo() = default;

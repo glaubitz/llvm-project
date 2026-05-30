@@ -24,6 +24,8 @@ public:
 
   void verifyTargetNode(const SelectionDAG &DAG,
                         const SDNode *N) const override;
+
+  bool isTargetMemoryOpcode(unsigned Opcode) const override;
 };
 
 } // namespace llvm
