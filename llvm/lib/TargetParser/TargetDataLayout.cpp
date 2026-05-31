@@ -123,31 +123,8 @@ static std::string computeLoongArchDataLayout(const Triple &TT) {
 }
 
 static std::string computeM68kDataLayout(const Triple &TT) {
-  std::string Ret = "";
-  // M68k is Big Endian
-  Ret += "E";
 
-  // FIXME how to wire it with the used object format?
-  Ret += "-m:e";
-
-  // M68k pointers are always 32 bit wide even for 16-bit CPUs.
-  // The ABI only specifies 16-bit alignment.
-  // On at least the 68020+ with a 32-bit bus, there is a performance benefit
-  // to having 32-bit alignment.
-  Ret += "-p:32:16:32";
-
-  // Bytes do not require special alignment, words are word aligned and
-  // long words are word aligned at minimum.
-  Ret += "-i8:8:8-i16:16:16-i32:16:32";
-
-  // FIXME no floats at the moment
-
-  // The registers can hold 8, 16, 32 bits
-  Ret += "-n8:16:32";
-
-  Ret += "-a:0:16-S16";
-
-  return Ret;
+  return "E-m:e-p:32:32-i8:8-i16:16-i32:32-n32";
 }
 
 namespace {
