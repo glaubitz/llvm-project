@@ -2529,7 +2529,8 @@ SDValue M68kTargetLowering::LowerBRCOND(SDValue Op, SelectionDAG &DAG) const {
 
   // Look pass (and (setcc_carry (cmp ...)), 1).
   if (Cond.getOpcode() == ISD::AND &&
-      Cond.getOperand(0).getOpcode() == M68kISD::SETCC_CARRY &&
+      (Cond.getOperand(0).getOpcode() == M68kISD::SETCC ||
+       Cond.getOperand(0).getOpcode() == M68kISD::SETCC_CARRY) &&
       isOneConstant(Cond.getOperand(1)))
     Cond = Cond.getOperand(0);
 
@@ -3779,6 +3780,20 @@ SDValue M68kTargetLowering::PerformDAGCombine(SDNode *N,
                                               DAGCombinerInfo &DCI) const {
   SelectionDAG &DAG = DCI.DAG;
   switch (N->getOpcode()) {
+  case ISD::SETCC: {
+    // Recognize (SETCC (CAS ...).getValue(0), Expected, COND_EQ)
+    // and replace with (M68kISD::SETCC COND_EQ, (CAS ...).getValue(1))
+    SDValue LHS = N->getOperand(0);
+    SDValue RHS = N->getOperand(1);
+    ISD::CondCode CC = cast<CondCodeSDNode>(N->getOperand(2))->get();
+    if (CC == ISD::SETEQ && LHS.getOpcode() == M68kISD::CAS &&
+        LHS.getResNo() == 0 && LHS.getOperand(2) == RHS) {
+      return DAG.getNode(M68kISD::SETCC, SDLoc(N), N->getValueType(0),
+                         DAG.getConstant(M68k::COND_EQ, SDLoc(N), MVT::i8),
+                         LHS.getValue(1));
+    }
+    break;
+  }
   case M68kISD::SUBX:
     return combineSUBX(N, DAG);
   case M68kISD::ADDX:
