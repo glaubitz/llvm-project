@@ -2301,6 +2301,17 @@ static bool isM68kLogicalCmp(SDValue Op) {
   return false;
 }
 
+static SDValue peelBooleanWrappers(SDValue V) {
+  while (V.getOpcode() == ISD::TRUNCATE || V.getOpcode() == ISD::ZERO_EXTEND ||
+         V.getOpcode() == ISD::ANY_EXTEND || V.getOpcode() == ISD::SIGN_EXTEND ||
+         V.getOpcode() == ISD::AssertZext || V.getOpcode() == ISD::AssertSext) {
+    V = V.getOperand(0);
+  }
+  if (V.getOpcode() == ISD::AND && isOneConstant(V.getOperand(1)))
+    V = V.getOperand(0);
+  return V;
+}
+
 static bool isTruncWithZeroHighBitsInput(SDValue V, SelectionDAG &DAG) {
   if (V.getOpcode() != ISD::TRUNCATE)
     return false;
@@ -2510,16 +2521,18 @@ SDValue M68kTargetLowering::LowerBRCOND(SDValue Op, SelectionDAG &DAG) const {
   SDValue CC;
   bool Inverted = false;
 
-  if (Cond.getOpcode() == ISD::SETCC) {
-    SDValue Op0 = Cond.getOperand(0);
-    SDValue Op1 = Cond.getOperand(1);
-    ISD::CondCode G_CC = cast<CondCodeSDNode>(Cond.getOperand(2))->get();
+  SDValue Peeled = peelBooleanWrappers(Cond);
+  if (Peeled.getOpcode() == M68kISD::SETCC ||
+      Peeled.getOpcode() == M68kISD::SETCC_CARRY) {
+    Cond = Peeled;
+  } else if (Peeled.getOpcode() == ISD::SETCC) {
+    SDValue Op0 = Peeled.getOperand(0);
+    SDValue Op1 = Peeled.getOperand(1);
+    ISD::CondCode G_CC = cast<CondCodeSDNode>(Peeled.getOperand(2))->get();
 
     // Recognize (SETCC (target SETCC), 0, EQ/NE)
     if (isNullConstant(Op1) && (G_CC == ISD::SETEQ || G_CC == ISD::SETNE)) {
-      SDValue Inner = Op0;
-      if (Inner.getOpcode() == ISD::AND && isOneConstant(Inner.getOperand(1)))
-        Inner = Inner.getOperand(0);
+      SDValue Inner = peelBooleanWrappers(Op0);
 
       if (Inner.getOpcode() == M68kISD::SETCC ||
           Inner.getOpcode() == M68kISD::SETCC_CARRY) {
@@ -2547,12 +2560,8 @@ SDValue M68kTargetLowering::LowerBRCOND(SDValue Op, SelectionDAG &DAG) const {
     }
   }
 
-  // Look pass (and (target setcc ...), 1).
-  if (Cond.getOpcode() == ISD::AND &&
-      (Cond.getOperand(0).getOpcode() == M68kISD::SETCC ||
-       Cond.getOperand(0).getOpcode() == M68kISD::SETCC_CARRY) &&
-      isOneConstant(Cond.getOperand(1)))
-    Cond = Cond.getOperand(0);
+  // Double check if we can peel again after LowerSETCC
+  Cond = peelBooleanWrappers(Cond);
 
   // If condition flag is set by a M68kISD::CMP, then use it as the condition
   // setting operand in place of the M68kISD::SETCC.
