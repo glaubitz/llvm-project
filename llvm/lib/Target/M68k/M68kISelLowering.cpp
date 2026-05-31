@@ -2511,6 +2511,26 @@ SDValue M68kTargetLowering::LowerBRCOND(SDValue Op, SelectionDAG &DAG) const {
   bool Inverted = false;
 
   if (Cond.getOpcode() == ISD::SETCC) {
+    SDValue Op0 = Cond.getOperand(0);
+    SDValue Op1 = Cond.getOperand(1);
+    ISD::CondCode G_CC = cast<CondCodeSDNode>(Cond.getOperand(2))->get();
+
+    // Recognize (SETCC (target SETCC), 0, EQ/NE)
+    if (isNullConstant(Op1) && (G_CC == ISD::SETEQ || G_CC == ISD::SETNE)) {
+      SDValue Inner = Op0;
+      if (Inner.getOpcode() == ISD::AND && isOneConstant(Inner.getOperand(1)))
+        Inner = Inner.getOperand(0);
+
+      if (Inner.getOpcode() == M68kISD::SETCC ||
+          Inner.getOpcode() == M68kISD::SETCC_CARRY) {
+        if (G_CC == ISD::SETEQ)
+          Inverted = !Inverted;
+        Cond = Inner;
+      }
+    }
+  }
+
+  if (Cond.getOpcode() == ISD::SETCC) {
     // Check for setcc([su]{add,sub}o == 0).
     if (cast<CondCodeSDNode>(Cond.getOperand(2))->get() == ISD::SETEQ &&
         isNullConstant(Cond.getOperand(1)) &&
@@ -2527,7 +2547,7 @@ SDValue M68kTargetLowering::LowerBRCOND(SDValue Op, SelectionDAG &DAG) const {
     }
   }
 
-  // Look pass (and (setcc_carry (cmp ...)), 1).
+  // Look pass (and (target setcc ...), 1).
   if (Cond.getOpcode() == ISD::AND &&
       (Cond.getOperand(0).getOpcode() == M68kISD::SETCC ||
        Cond.getOperand(0).getOpcode() == M68kISD::SETCC_CARRY) &&
@@ -2538,7 +2558,10 @@ SDValue M68kTargetLowering::LowerBRCOND(SDValue Op, SelectionDAG &DAG) const {
   // setting operand in place of the M68kISD::SETCC.
   unsigned CondOpcode = Cond.getOpcode();
   if (CondOpcode == M68kISD::SETCC || CondOpcode == M68kISD::SETCC_CARRY) {
-    CC = Cond.getOperand(0);
+    M68k::CondCode CCode = (M68k::CondCode)Cond.getConstantOperandVal(0);
+    if (Inverted)
+      CCode = M68k::GetOppositeBranchCondition(CCode);
+    CC = DAG.getConstant(CCode, DL, MVT::i8);
 
     SDValue Cmp = Cond.getOperand(1);
     unsigned Opc = Cmp.getOpcode();
@@ -2547,7 +2570,7 @@ SDValue M68kTargetLowering::LowerBRCOND(SDValue Op, SelectionDAG &DAG) const {
       Cond = Cmp;
       AddTest = false;
     } else {
-      switch (CC->getAsZExtVal()) {
+      switch (CCode) {
       default:
         break;
       case M68k::COND_VS:
